@@ -2,8 +2,11 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
+#include <windows.h>
 
 #include "debug.h"
+#include "wfio.h"
+#include "input.h"
                 
 #define STDIN 1
 
@@ -18,6 +21,8 @@
 
 #define NO_MORE_CHARS() (Eof_read && Next >= End_buf) 
 
+//#define INVALID_HANDLE_VALUE ((HANDLE)(ULONG_PTR)-1)
+
 typedef unsigned char uchar;
 
 uchar Start_buf[BUFSIZE]; // Input Buffer
@@ -29,7 +34,8 @@ uchar *pMark = END;		  // Start pf previous lexeme
 int pLineno = 1;          // line # of previous Lexeme
 int pLength = 1;          // Length of previous Lexeme
 
-int Inp_file = STDIN;     // Input file "handle"
+//int Inp_file = STDIN;     // Input file "handle"
+HANDLE Inp_file = NULL;
 int Lineno = 2;			  // Current line number
 int Mline = 2;            // Line # when mark_end() called
 int Termchar = 0;         /* Holds the character that was
@@ -40,13 +46,11 @@ int Eof_read = 0;         /* End of file has been read
                              This can be true with characters
                              still in the input buffer */
 
-extern int open(), close(), read();
+HANDLE (*Openp)() = d_Open; //pointer to open funciton
+int (*Closep)() = d_Close; //pointer to close funciton
+int (*Readp)() = d_Read; //pointer to read funciton
 
-int (*Openp)() = open; //pointer to open funciton
-int (*Closep)() = close; //pointer to close funciton
-int (*Readp)() = read; //pointer to read funciton
-
-void ii_io( int (*open_funct)(), int (*close_funct)(), int (*read_funct)() )
+void ii_io( HANDLE (*open_funct)(), int (*close_funct)(), int (*read_funct)() )
 {
     /* Lets you modify the open, close, and read
     *  file functions used by the the input system */
@@ -56,16 +60,20 @@ void ii_io( int (*open_funct)(), int (*close_funct)(), int (*read_funct)() )
     Readp = read_funct;
 }
 
-int ii_newfile(char* name)
+HANDLE ii_newfile(const char* name)
 {
-    int fd; // file descriptor
+    HANDLE fh; // file descriptor
 
-    if ((fd = !name ? STDIN : (*Openp)(name, O_RDONLY | O_BINARY)) != -1)
+    // if ((fd = !name ? STDIN : (*Openp)(name, O_RDONLY | O_BINARY)) != -1)
+     if ((fh = !name ? INVALID_HANDLE_VALUE : (*Openp)(name)) != INVALID_HANDLE_VALUE)
     {
-        if (Inp_file != STDIN)
+        if (Inp_file != INVALID_HANDLE_VALUE)
             (*Closep)(Inp_file);
+        else {
+            return INVALID_HANDLE_VALUE;
+        }
 
-        Inp_file = fd;
+        Inp_file = fh;
         Eof_read = 0;
 
         Next = END;
@@ -75,7 +83,7 @@ int ii_newfile(char* name)
         Lineno = 1;
         Mline = 1;
     }
-    return fd;
+    return fh;
 }
 
 char* ii_text()  { return(sMark); }
@@ -124,7 +132,7 @@ char* ii_mark_prev()
     return(pMark);
 }
 
-int ii_advance()
+uchar ii_advance()
 {
     /* Actuall input function. Returns the next char and advances past it */
     static int been_called = 0;
@@ -316,7 +324,7 @@ void ii_unput(char c)
     }
 }
 
-int ii_lookahead(n)
+int ii_lookahead(unsigned long n)
 {
     return (n == 1 && Termchar) ? Termchar : ii_look(n);
 }

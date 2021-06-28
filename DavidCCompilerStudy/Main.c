@@ -1,11 +1,26 @@
 // DavidCCompilerStudy.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include <iostream>
+#include <stdio.h>
+#include "dinput.h"
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    /*
+    ii_newfile("Example.txt");
+    unsigned char c;
+    for (int i = 0; i < 20; i++) {
+        c = ii_advance();
+        printf("%c", c);
+    }
+    */
+    ii_loadFile("Example.txt");
+    char c;
+    for (int i = 0; i < 20; i++) {
+        c = consumeChar();
+        printf("%c", c);
+    }
+    printf("\n");
     system("pause");
     return 0;
 }
