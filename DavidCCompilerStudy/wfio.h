@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <handleapi.h>
 
 HANDLE d_Open(const char* filename);

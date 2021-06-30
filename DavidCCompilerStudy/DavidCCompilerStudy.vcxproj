@@ -82,13 +82,15 @@
   <ItemGroup>
     <ClCompile Include="dinput.c" />
     <ClCompile Include="input.c" />
-    <ClCompile Include="Main.c" />
+    <ClCompile Include="lex.c" />
+    <ClCompile Include="main.c" />
     <ClCompile Include="wfio.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug.h" />
     <ClInclude Include="dinput.h" />
     <ClInclude Include="input.h" />
+    <ClInclude Include="lex.h" />
     <ClInclude Include="wfio.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
