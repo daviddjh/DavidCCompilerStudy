@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "dinput.h"
+#include "lex.h"
 
 int main()
 {
@@ -16,18 +17,14 @@ int main()
     }
     */
     ii_loadFile("Example.txt");
-    char c;
-    for (int i = 0; i < 20; i++) {
-        c = consumeChar();
-        printf("%c", c);
-    }
-    putbackChar(20);
-    printf("\n");
-    for (int i = 0; i < 20; i++) {
-        c = consumeChar();
-        printf("%c", c);
-    }
-    printf("\n");
+    Lexer lexer;
+    InitLexer(&lexer);
+    Token firstToken = getNextToken(&lexer);
+    printf("TOKEN: lexeme: \"%s\", Line Number: %d\n",firstToken.lexeme, firstToken.lineno);
+    firstToken = getNextToken(&lexer);
+    printf("TOKEN: lexeme: \"%s\", Line Number: %d\n",firstToken.lexeme, firstToken.lineno);
+    firstToken = getNextToken(&lexer);
+    printf("TOKEN: lexeme: \"%s\", Line Number: %d\n",firstToken.lexeme, firstToken.lineno);
     system("pause");
     return 0;
 }

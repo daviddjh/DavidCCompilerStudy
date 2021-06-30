@@ -57,9 +57,12 @@ char lookAhead(int i) {
 		return -1;
 }
 
-char putbackChar(int i) {
+char putbackChar(int i, uint16_t * lineNo) {
 	if (currentChar - i >= fileData){
-    currentChar -= i;
+    for(int j = 0; j < i; j++){
+      if(*currentChar == '\n') *(lineNo)--;
+      currentChar--;
+    }
 		return *(currentChar);
   }
 	else
