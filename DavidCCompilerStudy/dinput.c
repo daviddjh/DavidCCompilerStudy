@@ -1,7 +1,13 @@
-#include <windows.h>
 #include <stdint.h>
+#include <stdlib.h>
 
+#ifdef _WIN32
+#include <windows.h>
 #include "wfio.h"
+#elif defined(__unix__)
+#include "lfio.h"
+#define HANDLE FILE*
+#endif
 
 // not thread safe!
 uint32_t fileSize = 0;
@@ -13,7 +19,7 @@ void ii_loadFile(char * fileName) {
 
 	// Open the file and get it's size
 	HANDLE file = d_Open(fileName);
-	GetFileSizeEx(file, &fileSize);
+	d_GetFileSize(file, &fileSize);
 
 	// If there was a previos file loaded, free the memory to avoid mem leaks
 	if (fileData != NULL)
@@ -52,8 +58,10 @@ char lookAhead(int i) {
 }
 
 char putbackChar(int i) {
-	if (currentChar - i > fileSize)
-		return *(currentChar -= i);
+	if (currentChar - i >= fileData){
+    currentChar -= i;
+		return *(currentChar);
+  }
 	else
 		return -1;
 }

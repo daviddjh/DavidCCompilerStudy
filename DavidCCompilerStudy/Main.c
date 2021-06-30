@@ -1,6 +1,7 @@
 // DavidCCompilerStudy.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
+#include <stdlib.h>
 #include <stdio.h>
 #include "dinput.h"
 
@@ -16,6 +17,12 @@ int main()
     */
     ii_loadFile("Example.txt");
     char c;
+    for (int i = 0; i < 20; i++) {
+        c = consumeChar();
+        printf("%c", c);
+    }
+    putbackChar(20);
+    printf("\n");
     for (int i = 0; i < 20; i++) {
         c = consumeChar();
         printf("%c", c);

@@ -31,3 +31,7 @@ int d_Read(HANDLE file, void * buffer, int need)
 	else
 		return numBytesRead;
 }
+
+void d_GetFileSize(HANDLE file, uint32_t* fileSize){
+	GetFileSizeEx(file, fileSize);
+}
