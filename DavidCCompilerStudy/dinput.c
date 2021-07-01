@@ -26,13 +26,14 @@ void ii_loadFile(char * fileName) {
 		free(fileData);
 
 	// Allocate space to fill with file
-	fileData = malloc(sizeof(char) * fileSize);
+	fileData = malloc(sizeof(char) * fileSize + 1);
 
 	// Read the file into memory
 	d_Read(file, fileData, fileSize);
 
 	// Set Eof pointer
-	Eof = fileData + fileSize - 1;
+	Eof = fileData + fileSize;
+	*Eof = '\0';
 
 	// Close the handle
 	d_Close(file);
@@ -51,8 +52,10 @@ char consumeChar() {
 }
 
 char lookAhead(int i) {
-	if ((currentChar + i) >= fileData && (currentChar + i) <= Eof)
-		return *(currentChar + i);
+	if ((currentChar + i) >= fileData && (currentChar + i) < Eof)
+		return *(currentChar + i - 1);
+	else if ((currentChar + i) == Eof)
+		return '\0';
 	else
 		return -1;
 }

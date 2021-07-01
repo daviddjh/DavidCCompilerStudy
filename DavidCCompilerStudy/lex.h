@@ -2,25 +2,32 @@
 #include <stdint.h>
 
 typedef enum TOKEN_TYPE {
-	LP,         // '('
-	RP,         // ')'
-	LS,         // '{'
-	RS,         // '}'
-	SEMI,       // ';'
-	MT,         // >
-	LT,         // <
-	ASSIGN,     // =
-	AND,        // &
-	OR,         // |
-	MTOE,       // >=
-	LTOE,       // <=
+	EOFT = -1,   // 'EOF' Token
+	LP,          // '('
+	RP,          // ')'
+	LS,          // '{'
+	RS,          // '}'
+	SEMI,        // ';'
+	PLUS,        // +
+	MINUS,       // -
+	MULT,        // *
+	DIVIDE,      // /
+	NOT,         // !
+	MT,          // >
+	LT,          // <
+	ASSIGN,      // =
+	AND,         // &
+	OR,          // |
+	MTOE,        // >=
+	LTOE,        // <=
 	EQUIV,       // ==
-	IF,         // 'if'
-	INT,        // int
-	BOOL,       // bool
-	IDENTIFIER, // function name or variable
-	RETURN,     // return
-  LEX_ERROR   // Internal way of expressing scanning error
+	IF,          // 'if'
+	INT,         // int
+	BOOL,        // bool
+	RETURN,      // return
+	INT_LITERAL, // 0-9+
+	IDENTIFIER,  // function name or variable
+    LEX_ERROR    // Internal way of expressing scanning error
 } TOKEN_TYPE;
 
 typedef struct Token {
@@ -43,3 +50,4 @@ void InitLexer(Lexer* lexer);
 
 Token getNextToken(Lexer* lexer);
 Token getWordToken(Lexer* lexer);
+Token getNumberToken(Lexer* lexer);
