@@ -2,9 +2,11 @@
 #include <stdio.h>
 #include "dinput.h"
 #include "lex.h"
+#include "parse.h"
 
 int main()
 {
+    /*
     ii_loadFile("Example.txt");
     Lexer lexer;
     InitLexer(&lexer);
@@ -19,4 +21,29 @@ int main()
     }
     system("pause");
     return 0;
+    */
+    /*
+    Lexer lexer;
+    InitLexer(&lexer);
+    dl_lex(&lexer, "Example1.txt");
+    Token *token = malloc(sizeof(Token));
+    token = getNextToken(&lexer);
+    while (token->type != EOFT) {
+		printf("Lexem: %s\n", token->lexeme);
+		token = getNextToken(&lexer);
+    }
+    */
+    Lexer lexer;
+    InitLexer(&lexer);
+    dl_lex(&lexer, "Example1.txt");
+    Parser parser;
+    InitParser(&parser, &lexer);
+    Node *tempNode = malloc(sizeof(Node));
+	tempNode = parseExpresion(&parser, -9999);
+    while (tempNode != NULL) {
+		printf("Node token Lexeme: %s\n", tempNode->token->lexeme);
+		printf("    Node token Type: %d\n", tempNode->type);
+		printf("\n");
+		tempNode = parseExpresion(&parser, -9999);
+    }
 }

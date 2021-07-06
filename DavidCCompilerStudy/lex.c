@@ -5,6 +5,7 @@
 
 #include "lex.h"
 #include "dinput.h"
+#include "dynarray.h"
 
 #define IS_ALPHANUMERIC(x) (48 <= x && x <= 57) || (65 <= x && x <= 90) || (97 <= x && x <= 122) || x == 95 // asci values for 0-9, A-Z, _, a-z , in order
 #define IS_NUMERIC(x) (48 <= x && x <= 57) // asci values for 0-9
@@ -15,11 +16,31 @@ void InitLexer(Lexer* lexer) {
 		return;
 	}
 	lexer->LineNo = 1;
+	lexer->tokens = dd_makeDynamicArray();
+	lexer->nextToken = 0;
 	return;
 }
 
-Token getNextToken(Lexer* lexer) {
-	lexer->currentLexeme = (char*)calloc(128, sizeof(char));
+Lexer* dl_lex(Lexer* lexer, const char * filename) {
+    ii_loadFile(filename);
+	Token* currentToken = malloc(sizeof(Token));
+	*currentToken = makeNextToken(lexer);
+	while (currentToken->type != EOFT) {
+		dd_push(lexer->tokens, currentToken);
+	    currentToken = malloc(sizeof(Token));
+		*currentToken = makeNextToken(lexer);
+	}
+	dd_push(lexer->tokens, currentToken);
+}
+
+void dl_destory(Lexer* lex) {
+	free(lex);
+}
+
+Token makeNextToken(Lexer* lexer) {
+	lexer->currentLexeme = NULL;
+	lexer->currentLexeme = malloc(128, sizeof(char));
+	memset(lexer->currentLexeme, '\0', 128);
 	for (;;) {
 		char c = lookAhead(1);
 		switch (c)
@@ -197,10 +218,10 @@ Token getNextToken(Lexer* lexer) {
 		default:
 		{
 			if (IS_NUMERIC(c)) {
-				return getNumberToken(lexer);
+				return makeNumberToken(lexer);
 			}
 			else if (IS_ALPHANUMERIC(c)) {
-				return getWordToken(lexer);
+				return makeWordToken(lexer);
 			}
 			else {
 				consumeChar();
@@ -212,7 +233,7 @@ Token getNextToken(Lexer* lexer) {
 	}
 }
 
-Token getWordToken(Lexer* lexer) {
+Token makeWordToken(Lexer* lexer) {
 	// White space is already gone
 	char* currentChar = lexer->currentLexeme;
 	while (currentChar - lexer->currentLexeme < 128) {
@@ -262,7 +283,7 @@ Token getWordToken(Lexer* lexer) {
 	}
 }
 
-Token getNumberToken(Lexer* lexer) {
+Token makeNumberToken(Lexer* lexer) {
 	// White space is already gone
 	char* currentChar = lexer->currentLexeme;
 	while (currentChar - lexer->currentLexeme < 128) {
@@ -290,4 +311,18 @@ Token getNumberToken(Lexer* lexer) {
 	}
 	Token token = { INT_LITERAL, lexer->currentLexeme, lexer->LineNo };
 	return token;
+}
+
+Token* getNextToken(Lexer* lexer) {
+	if (lexer->nextToken != lexer->tokens->capacity - 1) {
+		return *((lexer->tokens->array) + lexer->nextToken++);
+	}
+	else {
+		return *((lexer->tokens->array) + lexer->nextToken);
+	}
+
+}
+
+Token* peakNextToken(Lexer* lexer) {
+	return (lexer->tokens->array) + lexer->nextToken;
 }

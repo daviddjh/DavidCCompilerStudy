@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 
+#include "dynarray.h"
+
 typedef enum TOKEN_TYPE {
 	EOFT = -1,   // 'EOF' Token
 	LP,          // '('
@@ -42,12 +44,19 @@ typedef struct Token {
 } Token;
 
 typedef struct Lexer {
-  char * currentLexeme;
+	char * currentLexeme;
 	uint16_t LineNo; // 65536 lines till overflow
+	DynamicArray * tokens;
+	int nextToken;
 } Lexer;
 
 void InitLexer(Lexer* lexer);
 
-Token getNextToken(Lexer* lexer);
-Token getWordToken(Lexer* lexer);
-Token getNumberToken(Lexer* lexer);
+Lexer* dl_lex(Lexer* , const char *);
+void dl_destroy(Lexer* );
+
+Token makeNextToken(Lexer* lexer);
+Token makeWordToken(Lexer* lexer);
+Token makeNumberToken(Lexer* lexer);
+Token* getNextToken(Lexer* lexer);
+Token* peakNextToken(Lexer* lexer);

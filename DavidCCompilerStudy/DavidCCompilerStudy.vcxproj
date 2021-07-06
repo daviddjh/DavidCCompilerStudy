@@ -57,6 +57,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -71,6 +72,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -81,16 +83,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dinput.c" />
+    <ClCompile Include="dynarray.c" />
     <ClCompile Include="input.c" />
     <ClCompile Include="lex.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="parse.c" />
     <ClCompile Include="wfio.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug.h" />
     <ClInclude Include="dinput.h" />
+    <ClInclude Include="dynarray.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="lex.h" />
+    <ClInclude Include="parse.h" />
     <ClInclude Include="wfio.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

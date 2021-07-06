@@ -1,6 +1,6 @@
 #pragma once
 
-void ii_loadFile(char* fileName);
+void ii_loadFile(const char* fileName);
 
 char consumeChar();
 

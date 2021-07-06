@@ -15,7 +15,7 @@ char* fileData = NULL;
 char* Eof = NULL;
 char* currentChar = NULL;
 
-void ii_loadFile(char * fileName) {
+void ii_loadFile(const char * fileName) {
 
 	// Open the file and get it's size
 	HANDLE file = d_Open(fileName);
