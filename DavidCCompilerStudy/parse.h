@@ -30,3 +30,5 @@ typedef struct AST {
 void InitParser(Parser* parser, Lexer* lexer);
 Node* parseExpresions();
 Node* parseExpresion(Parser *parser, uint32_t presedence);
+void parseInt(Parser* parser, Node* ast_int);
+Node* parseBiop(Parser* parser, Node* oldRoot);

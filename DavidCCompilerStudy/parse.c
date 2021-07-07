@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include "parse.h"
 #include "lex.h"
@@ -52,8 +53,8 @@ Node* parseExpresion(Parser* parser, uint32_t pres) {
 }
 
 Node* parseBiop(Parser* parser, Node* oldRoot) {
-	if (ast_int->type != AST_INT) {
-		printf("Parse error, operand to a BIOP not an int, line: %d\n", ast_int->token->lineno);
+	if (oldRoot->type != AST_INT) {
+		printf("Parse error, operand to a BIOP not an int, line: %d\n", oldRoot->token->lineno);
 		exit(1);
 	}
 	Node* newRoot = malloc(sizeof(Node));
@@ -68,14 +69,13 @@ Node* parseBiop(Parser* parser, Node* oldRoot) {
 		break;
 	case(PLUS):
 	case(MINUS):
-		root->type = AST_BIOP;
+		newRoot->type = AST_BIOP;
 		break;
 	default:
-		root->type = AST_UNKNOWN;
+		newRoot->type = AST_UNKNOWN;
 	}
 }
 
-parseInt(Parser* parser, Node* ast_int) {
+void parseInt(Parser* parser, Node* ast_int) {
 	ast_int->type = AST_INT;
 }
-

@@ -38,9 +38,7 @@ void dl_destory(Lexer* lex) {
 }
 
 Token makeNextToken(Lexer* lexer) {
-	lexer->currentLexeme = NULL;
-	lexer->currentLexeme = malloc(128, sizeof(char));
-	memset(lexer->currentLexeme, '\0', 128);
+	lexer->currentLexeme = calloc(128, sizeof(char));
 	for (;;) {
 		char c = lookAhead(1);
 		switch (c)
