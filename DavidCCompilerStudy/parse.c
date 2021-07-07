@@ -76,55 +76,41 @@ Node * parseBiop(Parser* parser, Node* oldRoot) {
 	newRoot->children = dd_makeDynamicArray();
 	dd_push(newRoot->children, oldRoot);
 
+  // Set the precidence
 	switch (newRoot->token->type) {
 	case(MULT):
+		newRoot->precidence = 400;
+    break;
 	case(DIVIDE):
-	{
-		// Set up this node's type
-		// Set the precidence
 		newRoot->precidence = 200;
-
-		// Add the next expresion or operand to the tree
-		Node* rightChild = NULL;
-		rightChild = parseExpresion(parser);
-		dd_push(newRoot->children, rightChild);
-
-		// Rotate tree if the operand is missaligned
-		if (rightChild->precidence < newRoot->precidence) {
-			newRoot = leftRotateTree(newRoot, rightChild);
-		}
-
-		// Return the new root of this subtree and its precidence
-		return newRoot;
 		break;
-	}
 	case(PLUS):
-	case(MINUS):
-	{
-		// Set up this node's type
-		// Set the precidence
 		newRoot->precidence = 100;
-
-		// Add the next expresion or operand to the tree
-		Node* rightChild = NULL;
-		rightChild = parseExpresion(parser);
-		dd_push(newRoot->children, rightChild);
-
-		// Rotate tree if the operand is missaligned
-		if (rightChild->precidence < newRoot->precidence) {
-			newRoot = leftRotateTree(newRoot, rightChild);
-		}
-
-		// Return the new root of this subtree and its precidence
-		return newRoot;
 		break;
-	}
+	case(MINUS):
+		newRoot->precidence = 50;
+		break;
 	default:
 		newRoot->type = AST_UNKNOWN;
+		newRoot->precidence = -9999;
+    break;
 	}
+
+  // Add the next expresion or operand to the tree
+  Node* rightChild = NULL;
+  rightChild = parseExpresion(parser);
+  dd_push(newRoot->children, rightChild);
+
+  // Rotate tree if the operand is missaligned
+  if (rightChild->precidence < newRoot->precidence) {
+    newRoot = leftRotateTree(newRoot, rightChild);
+  }
+
+  // Return the new root of this subtree and its precidence
+  return newRoot;
 }
 
-Node * parseInt(Parser* parser, Node* ast_int) {
+Node * parseInt(Parser* parser) {
 	// Make root node
 	Node * root = malloc(sizeof(Node));
 	root->children = NULL;
