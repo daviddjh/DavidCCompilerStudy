@@ -16,11 +16,13 @@ typedef struct Node {
 	Token* token;
 	AST_Type type;
 	DynamicArray* children;
+	uint16_t precidence;
 } Node;
 
 typedef struct Parser {
 	Lexer* lexer;
 	Node* ast_root;
+	Token* currentToken;
 } Parser;
 
 typedef struct AST {
@@ -29,6 +31,7 @@ typedef struct AST {
 
 void InitParser(Parser* parser, Lexer* lexer);
 Node* parseExpresions();
-Node* parseExpresion(Parser *parser, uint32_t presedence);
-void parseInt(Parser* parser, Node* ast_int);
-Node* parseBiop(Parser* parser, Node* oldRoot);
+Node * parseExpresion(Parser *parser);
+Node * parseInt(Parser* parser);
+Node * parseBiop(Parser* parser, Node* oldRoot);
+Node* leftRotateTree(Node* root, Node* pivot);

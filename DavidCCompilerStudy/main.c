@@ -12,8 +12,8 @@ int main()
     InitLexer(&lexer);
     Token m_Token;
     do {
-		m_Token = getNextToken(&lexer);
-		printf("TOKEN: lexeme: \"%s\"\n    T Type: %d\n    Line Number: %d\n",m_Token.lexeme, m_Token.type, m_Token.lineno);
+        m_Token = getNextToken(&lexer);
+        printf("TOKEN: lexeme: \"%s\"\n    T Type: %d\n    Line Number: %d\n",m_Token.lexeme, m_Token.type, m_Token.lineno);
     } while (m_Token.type != EOFT && m_Token.type != LEX_ERROR); // while the end of file hasn't been reached, print out tokens
     printf("\n");
     if (m_Token.type == LEX_ERROR) {
@@ -29,21 +29,31 @@ int main()
     Token *token = malloc(sizeof(Token));
     token = getNextToken(&lexer);
     while (token->type != EOFT) {
-		printf("Lexem: %s\n", token->lexeme);
-		token = getNextToken(&lexer);
+        printf("Lexem: %s\n", token->lexeme);
+        token = getNextToken(&lexer);
     }
     */
     Lexer lexer;
     InitLexer(&lexer);
-    dl_lex(&lexer, "Example1.txt");
+    dl_lex(&lexer, "Example.txt");
     Parser parser;
     InitParser(&parser, &lexer);
-    Node *tempNode = malloc(sizeof(Node));
-	tempNode = parseExpresion(&parser, -9999);
-    while (tempNode != NULL) {
-		printf("Node token Lexeme: %s\n", tempNode->token->lexeme);
-		printf("    Node token Type: %d\n", tempNode->type);
-		printf("\n");
-		tempNode = parseExpresion(&parser, -9999);
+    Node* ast_root;
+    ast_root = parseExpresion(&parser);
+    if (ast_root != NULL) {
+		if(ast_root->token != NULL)
+			printf("Node token Lexeme: %s\n", ast_root->token->lexeme);
+		else 
+			printf("Node token Lexeme: NULL\n");
+		printf("    Node token Type: %d\n", ast_root->type);
     }
+    else {
+        printf("AST Root is NULL\n");
+    }
+    Node* child = dd_get(ast_root->children, 0);
+    printf("Left Node: %s\n", child->token->lexeme);
+    child = dd_get(ast_root->children, 1);
+    printf("Right Node: %s\n", child->token->lexeme);
+
+	printf("\n");
 }

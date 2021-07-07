@@ -52,9 +52,9 @@ char consumeChar() {
 }
 
 char lookAhead(int i) {
-	if ((currentChar + i) >= fileData && (currentChar + i) < Eof)
+	if ((currentChar + i - 1) >= fileData && (currentChar + i - 1) < Eof)
 		return *(currentChar + i - 1);
-	else if ((currentChar + i) == Eof)
+	else if ((currentChar + i -1 ) == Eof)
 		return '\0';
 	else
 		return -1;

@@ -322,5 +322,5 @@ Token* getNextToken(Lexer* lexer) {
 }
 
 Token* peakNextToken(Lexer* lexer) {
-	return (lexer->tokens->array) + lexer->nextToken;
+	return *((lexer->tokens->array) + lexer->nextToken);
 }

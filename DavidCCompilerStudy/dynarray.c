@@ -37,7 +37,7 @@ void* dd_free(DynamicArray* dynarray) {
 }
 
 void* dd_get(DynamicArray* dynarray, uint16_t index) {
-	return dynarray->array[dynarray->size];
+	return dynarray->array[index];
 }
 
 void dd_set(DynamicArray* dynarray, uint16_t index, void * newItem) {
