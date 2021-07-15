@@ -13,55 +13,90 @@ Node* parseExpresions() {
 	
 }
 
-Node *parseExpresion(Parser* parser) {
-	// Get token
-	parser->currentToken = getNextToken(parser->lexer);
+Node *parseExpresion(Parser* parser, int pres) {
 
-	if (parser->currentToken->type == EOFT) {
-		return -9999;
-	}
-	
+
+  // Setup Nodes
 	Node* root = NULL;
+	Node* left = NULL;
 
-	switch (parser->currentToken->type) {
-	case(INT_LITERAL):
-		root = parseInt(parser);
-		Token* token = peakNextToken(parser->lexer);
-		if (token->type >= PLUS && token->type <= DIVIDE) {
-			root = parseBiop(parser, root);
-		}
-		return root;
-		break;
-	case(MULT):
-	case(DIVIDE):
-		root->type = AST_BIOP;
-		break;
-	case(PLUS):
-	case(MINUS):
-		root->type = AST_BIOP;
-		break;
-	case(RETURN):
-		root->type = AST_RETURN;
-		break;
-	default:
-		root = malloc(sizeof(Node));
-		root->type = AST_UNKNOWN;
-		root->precidence = -9999;
-		root->token = parser->currentToken;
-	}
-	return root;
+  // Peak the next token
+  parser->currentToken = peakNextToken(parser->lexer);
+  //root = NULL;
+
+  // Loop until ;
+  while(parser->currentToken->type != SEMI) {
+
+    // if the currentToken type is END OF FILE, then return root=NULL
+    if (parser->currentToken->type == EOFT) {
+      fprintf(stderr, "Parse error: Expecting ';' token before EOF, line: %d\n", left->token->lineno);
+      exit(1);
+    }
+
+    switch (parser->currentToken->type) {
+
+      // If Biop:
+      case(MULT):
+      case(DIVIDE):
+        // root = parseBiop
+        // Set root->left to left (in args)
+        // Set root->right to parseExpresion
+        // root = parseBiop
+        // Set root->left to left
+        // Set root->right to parseExpresion
+        {
+          if(pres > 100) { return left; } else {
+            root = parseBiop(parser, left, 100);
+          }
+          break;
+        }
+      case(PLUS):
+      case(MINUS):
+        {
+          if(pres > 50) { return left; } else {
+            root = parseBiop(parser, left, 50);
+          }
+          break;
+        }
+        
+      // If Int:
+      case(INT_LITERAL):
+        root = parseInt(parser);
+        break;
+
+      // Unknown
+      default:
+        root = malloc(sizeof(Node));
+        root->type = AST_UNKNOWN;
+        root->precidence = -9999;
+        root->token = parser->currentToken;
+    }
+    
+    // Set left to root so next node can use it
+    left = root;
+
+    // Peak the next token
+    parser->currentToken = peakNextToken(parser->lexer);
+    //root = NULL;
+  }
+
+  return root;
+
 }
 
-Node * parseBiop(Parser* parser, Node* oldRoot) {
-	if (oldRoot == NULL) {
+Node * parseBiop(Parser* parser, Node* left, int pres) {
+	if (left == NULL) {
 		fprintf(stderr, "Error, parseBiop got a NULL oldRoot\n");
 		exit(1);
 	}
 	// check the old root
-	if (oldRoot->type != AST_INT) {
-		fprintf(stderr, "Parse error, operand to a BIOP not an int, line: %d\n", oldRoot->token->lineno);
+  // TODO this is type checking, idk if we should do this yet
+  /*
+	if (left ->type != AST_INT) {
+		fprintf(stderr, "Parse error, operand to a BIOP not an int, line: %d\n", left->token->lineno);
 		exit(1);
 	}
+  */
 
 	// This node is the bianary operator
 	Node* newRoot = malloc(sizeof(Node));
@@ -69,12 +104,12 @@ Node * parseBiop(Parser* parser, Node* oldRoot) {
 	// Set up this node
 	newRoot->children = NULL;
 	newRoot->type = AST_BIOP;
-	newRoot->token = getNextToken(parser->lexer);
+	newRoot->token = eatNextToken(parser->lexer);
 	newRoot->precidence = 0;
 
 	// Add the previous token (oldRoot) to the children array of this node
 	newRoot->children = dd_makeDynamicArray();
-	dd_push(newRoot->children, oldRoot);
+	dd_push(newRoot->children, left);
 
   // Set the precidence
 	switch (newRoot->token->type) {
@@ -98,13 +133,15 @@ Node * parseBiop(Parser* parser, Node* oldRoot) {
 
   // Add the next expresion or operand to the tree
   Node* rightChild = NULL;
-  rightChild = parseExpresion(parser);
+  rightChild = parseExpresion(parser, pres);
   dd_push(newRoot->children, rightChild);
 
   // Rotate tree if the operand is missaligned
+  /*
   if (rightChild->precidence < newRoot->precidence) {
     newRoot = leftRotateTree(newRoot, rightChild);
   }
+  */
 
   // Return the new root of this subtree and its precidence
   return newRoot;
@@ -114,9 +151,8 @@ Node * parseInt(Parser* parser) {
 	// Make root node
 	Node * root = malloc(sizeof(Node));
 	root->children = NULL;
-	root->token = parser->currentToken;
+	root->token = eatNextToken(parser->lexer);
 	root->type = AST_INT;
-	root->precidence = 9999;
 
 	return root;
 }

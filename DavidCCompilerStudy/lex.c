@@ -311,7 +311,7 @@ Token makeNumberToken(Lexer* lexer) {
 	return token;
 }
 
-Token* getNextToken(Lexer* lexer) {
+Token* eatNextToken(Lexer* lexer) {
 	if (lexer->nextToken != lexer->tokens->capacity - 1) {
 		return *((lexer->tokens->array) + lexer->nextToken++);
 	}

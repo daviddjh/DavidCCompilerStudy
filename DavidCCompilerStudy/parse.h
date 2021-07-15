@@ -29,9 +29,11 @@ typedef struct AST {
 	Node* root;
 } AST;
 
-void InitParser(Parser* parser, Lexer* lexer);
+void  InitParser(Parser* parser, Lexer* lexer);
 Node* parseExpresions();
-Node * parseExpresion(Parser *parser);
-Node * parseInt(Parser* parser);
-Node * parseBiop(Parser* parser, Node* oldRoot);
+Node* parseExpresion(Parser *parser, int);
+Node* parseInt(Parser* parser);
+Node* parseBiop(Parser* parser, Node* oldRoot, int);
+
 Node* leftRotateTree(Node* root, Node* pivot);
+Node* rightRotateTree(Node* root, Node* pivot);

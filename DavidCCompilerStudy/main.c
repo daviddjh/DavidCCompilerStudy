@@ -39,7 +39,7 @@ int main()
     Parser parser;
     InitParser(&parser, &lexer);
     Node* ast_root;
-    ast_root = parseExpresion(&parser);
+    ast_root = parseExpresion(&parser, -9999);
     if (ast_root != NULL) {
 		if(ast_root->token != NULL)
 			printf("Node token Lexeme: %s\n", ast_root->token->lexeme);

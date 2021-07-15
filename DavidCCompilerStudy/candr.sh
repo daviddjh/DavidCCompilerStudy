@@ -9,4 +9,5 @@ make
 # Change working directory to Build/Debug folder
 cd /home/daviddjh/dev/DavidCCompilerStudy/Build/Debug
 
+# Run program that was just built
 ./SampleCompiler

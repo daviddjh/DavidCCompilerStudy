@@ -58,5 +58,5 @@ void dl_destroy(Lexer* );
 Token makeNextToken(Lexer* lexer);
 Token makeWordToken(Lexer* lexer);
 Token makeNumberToken(Lexer* lexer);
-Token* getNextToken(Lexer* lexer);
+Token* eatNextToken(Lexer* lexer);
 Token* peakNextToken(Lexer* lexer);
