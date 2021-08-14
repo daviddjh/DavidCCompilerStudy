@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -82,21 +82,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="codeGen.c" />
     <ClCompile Include="dinput.c" />
     <ClCompile Include="dynarray.c" />
-    <ClCompile Include="input.c" />
+    <ClCompile Include="hash.c" />
     <ClCompile Include="lex.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="parse.c" />
+    <ClCompile Include="symbol.c" />
     <ClCompile Include="wfio.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="codeGen.h" />
+    <ClInclude Include="dcommon.h" />
     <ClInclude Include="debug.h" />
     <ClInclude Include="dinput.h" />
     <ClInclude Include="dynarray.h" />
-    <ClInclude Include="input.h" />
+    <ClInclude Include="hash.h" />
     <ClInclude Include="lex.h" />
     <ClInclude Include="parse.h" />
+    <ClInclude Include="symbol.h" />
     <ClInclude Include="wfio.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

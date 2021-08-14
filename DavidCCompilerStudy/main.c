@@ -3,6 +3,9 @@
 #include "dinput.h"
 #include "lex.h"
 #include "parse.h"
+#include "codeGen.h"
+#include "dcommon.h"
+#include "dynarray.h"
 
 int main()
 {
@@ -38,8 +41,20 @@ int main()
     dl_lex(&lexer, "Example.txt");
     Parser parser;
     InitParser(&parser, &lexer);
-    Node* ast_root;
-    ast_root = parseExpresion(&parser, -9999);
+    parser.ast_root = parseBlock(&parser, TRUE);
+    code_generator codeGen;
+    InitCodeGen(&codeGen, &parser);
+    GenerateCode(&codeGen);
+    /*
+    for (int i = 0; i < parser.ast_root->children->size; i++) {
+		traverseAST(&codeGen, dd_get(parser.ast_root->children, i), 0);
+    }
+    */
+	traverseAST(&codeGen, parser.ast_root, 0);
+    printSymbolTable(parser.table);
+
+
+    /*
     if (ast_root != NULL) {
 		if(ast_root->token != NULL)
 			printf("Node token Lexeme: %s\n", ast_root->token->lexeme);
@@ -50,10 +65,11 @@ int main()
     else {
         printf("AST Root is NULL\n");
     }
-    Node* child = dd_get(ast_root->children, 0);
+    AST_Node* child = dd_get(ast_root->children, 0);
     printf("Left Node: %s\n", child->token->lexeme);
     child = dd_get(ast_root->children, 1);
     printf("Right Node: %s\n", child->token->lexeme);
+    */
 
 	printf("\n");
 }

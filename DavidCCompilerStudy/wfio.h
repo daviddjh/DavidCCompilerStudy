@@ -3,7 +3,11 @@
 #include <stdint.h>
 #include <handleapi.h>
 
-HANDLE d_Open(const char* filename);
+// Open a file for reading. must exist
+HANDLE d_OpenR(const char* filename);
+
+// Open a file for writing. Doesn't have to exist, will make one if needed
+HANDLE d_OpenW(const char* filename);
 
 int d_Close(HANDLE file);
 

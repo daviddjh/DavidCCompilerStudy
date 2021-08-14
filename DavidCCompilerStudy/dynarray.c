@@ -36,11 +36,11 @@ void* dd_free(DynamicArray* dynarray) {
 	free(dynarray);
 }
 
-void* dd_get(DynamicArray* dynarray, uint16_t index) {
+void* dd_get(DynamicArray* dynarray, uint32_t index) {
 	return dynarray->array[index];
 }
 
-void dd_set(DynamicArray* dynarray, uint16_t index, void * newItem) {
+void dd_set(DynamicArray* dynarray, uint32_t index, void * newItem) {
 	if (index > (dynarray->capacity - 1) || index < 0){
 		printf("ERROR (dynarray): Bad set");
 		return;
@@ -48,7 +48,7 @@ void dd_set(DynamicArray* dynarray, uint16_t index, void * newItem) {
 	dynarray->array[index] = newItem;
 }
 
-void dd_resize(DynamicArray* dynarray, uint16_t capacity) {
+void dd_resize(DynamicArray* dynarray, uint32_t capacity) {
 	void** temp = dynarray->array;
 	if (capacity < dynarray->capacity) {
 		printf("Error(dynarray): Can't resize array with this capacity: %u", capacity);
