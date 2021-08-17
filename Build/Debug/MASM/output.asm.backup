@@ -1,0 +1,11 @@
+extrn ExitProcess: PROC   ; external functions in system libraries
+.code
+Start PROC
+i = DWORD PTR 4
+push  rbp
+mov   rbp, rsp
+sub   rsp, 4
+mov   ecx, 
+call ExitProcess
+Start ENDP
+END

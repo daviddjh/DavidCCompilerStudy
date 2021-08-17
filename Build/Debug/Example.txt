@@ -1,11 +1,7 @@
-; ( { int } ) ; int return
-bool () {} ; int < <= > >=
-& | if ==
-
-if ( 1234 < 5678 ) {
-  var = other_var;
-  if( !(var + var < other_var)){
-    return 20/20*20;
-    123ee_;
-  }
-}
+1 + 2 * 3 + 1 + 1;
+1 + 2;
+1 + 3;
+int i;
+int j;
+int k;
+int l;
