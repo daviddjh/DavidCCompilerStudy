@@ -23,6 +23,45 @@ dcg_Reg popReg(code_generator* codeGen) {
 	return temp;
 }
 
+void resetRegs(code_generator* codeGen) {
+	// Fill stack of registers cause all of them are for use
+	// Push First temp Registers
+	BOOL containsReg = FALSE;
+	for (int i = dcg_COUNT - 1; i >= dcg_r10d; i--) {
+		containsReg = FALSE;
+		for (int j = 0; j < codeGen->regStack->size; j++) {
+			dcg_Reg* temp = dd_get(codeGen->regStack, j);
+			if (*temp == i) {
+				containsReg = TRUE;
+				continue;
+			}
+		}
+		if (!containsReg)
+			pushReg(codeGen, i);
+	}
+	// Push other temp Registers
+	containsReg = FALSE;
+	for (int j = 0; j < codeGen->regStack->size; j++) {
+		dcg_Reg* temp = dd_get(codeGen->regStack, j);
+		if (*temp == dcg_ecx) {
+			containsReg = TRUE;
+			continue;
+		}
+	}
+	if (!containsReg)
+		pushReg(codeGen, dcg_ecx);
+	containsReg = FALSE;
+	for (int j = 0; j < codeGen->regStack->size; j++) {
+		dcg_Reg* temp = dd_get(codeGen->regStack, j);
+		if (*temp == dcg_eax) {
+			containsReg = TRUE;
+			continue;
+		}
+	}
+	if (!containsReg)
+		pushReg(codeGen, dcg_eax);
+}
+
 void InitCodeGen(code_generator* codeGen, Parser* parser) {
 	if (codeGen == NULL || parser == NULL) {
 		fprintf(stderr, "Code Generator initiated with NULL values");
@@ -50,10 +89,36 @@ void traverseAST(code_generator* codeGen, AST_Node* currentNode, int level) {
 	for (int j = 0; j < level; j++) {
 		printf("  ");
 	}
+	switch (currentNode->type) {
+	case(AST_BLOCK):
+		printf("<AST_BLOCK>: ");
+		break;
+	case(AST_DECL):
+		printf("<AST_DECL>: ");
+		break;
+	case(AST_IDENT):
+		printf("<AST_IDENT>: ");
+		break;
+	case(AST_INT):
+		printf("<AST_INT>: ");
+		break;
+	case(AST_BIOP):
+		printf("<AST_BIOP>: ");
+		break;
+	case(AST_UNKNOWN):
+		printf("<AST_UNKNOWN>: ");
+		break;
+	case(AST_RETURN):
+		printf("<AST_RETURN>: ");
+		break;
+	default:
+		printf("<Unknown>: ");
+		break;
+	}
 	
 	printf("%s\n", currentNode->token->lexeme);
 	if (currentNode->children != NULL) {
-		for (int i = 0; i < currentNode->children->size; i++) {
+		for (unsigned int i = 0; i < currentNode->children->size; i++) {
 			if ((nextNode = dd_get(currentNode->children, i)) != NULL) {
 				traverseAST(codeGen, nextNode, level + 1);
 			}
@@ -64,15 +129,39 @@ void traverseAST(code_generator* codeGen, AST_Node* currentNode, int level) {
 void freeOpNode(code_generator* codeGen, OpTreeNode** node) {
 	if (*node != NULL) {
 		if ((*node)->left != NULL) {
-			freeOpNode(codeGen, (*node)->left);
+			freeOpNode(codeGen, &((*node)->left));
 		}
 		if ((*node)->right != NULL) {
-			freeOpNode(codeGen, (*node)->right);
+			freeOpNode(codeGen, &((*node)->right));
 		}
 
 		free(*node);
 		*node = NULL;
 	}
+}
+
+/*
+*	If this node was storing a result in a Register
+*	This function will push that register back onto the available register stack
+*/
+void pushUsedReg(code_generator* codeGen, OpTreeNode* node) {
+	// Check first 4 bits for the REG arg type
+	if (node->arg_struct->arg_types & dcg_OpCodeArgType_REG) {
+		pushReg(codeGen, node->arg_struct->OpArg1.arg_reg);
+	}
+}
+
+/* 
+*    arg_types is an unsigned char
+*    the first 4 bits of the unsigned char will determine the first arguments type
+*    the second 4 bits of the unsigned char will determine the second arguments type
+*/
+void setArgTypes(unsigned char *arg_types, dcg_OpCodeArgType arg1, dcg_OpCodeArgType arg2) {
+
+	// set first 4 bits
+	*arg_types |= arg1;
+	// set second 4 bytes
+	*arg_types |= (arg2 << 4);
 }
 
 /*
@@ -83,56 +172,97 @@ void freeOpNode(code_generator* codeGen, OpTreeNode** node) {
 OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int level) {
 	AST_Node * nextASTNode;
 	OpTreeNode* thisOpNode = malloc(sizeof(OpTreeNode));
+	AST_Node* left_side_AST_node;
+	AST_Node* right_side_AST_node;
 
-	thisOpNode->left     = NULL;
-	thisOpNode->right    = NULL;
-	thisOpNode->code     = dcg_NOP;
-	thisOpNode->ast_node = NULL;
+	thisOpNode->left                  = NULL;
+	thisOpNode->right                 = NULL;
+	thisOpNode->code                  = dcg_NOP;
+	thisOpNode->ast_node              = NULL;
+	thisOpNode->arg_struct            = malloc(sizeof(dcg_ArgStruct));
+	thisOpNode->arg_struct->arg_types = 0;
 
+	// Build OpNode subtree depending on the AST_Node type
 	switch (currentASTNode->type) {
 	case(AST_BLOCK):
-		// Only generate the first child of a ast_block
 		OpTreeNode* leftNode = NULL;
-		//for (int i = currentASTNode->children->size - 1; i >= 0; i--) {
-		for (int i = 0; i < currentASTNode->children->size; i++) {
+
+		// For each child of the block
+		for (unsigned int i = 0; i < currentASTNode->children->size; i++) {
+
+			// I think we can release all registers after each expression?
 			// Basicaly make a linked list of OpNodes in order
 			AST_Node* childNode = (AST_Node*)dd_get(currentASTNode->children, i);
 			thisOpNode = buildOpTree(codeGen, childNode, level + 1);
-			// if There is an OpNode returned, currently isnt with variable declarations
+			resetRegs(codeGen);
+
+			// Need to traverse all the way down the left side to place node
 			if (thisOpNode != NULL) {
-				thisOpNode->left  = leftNode;
-				thisOpNode->right = NULL;
+				OpTreeNode* temp = thisOpNode;
+				while (temp->left != NULL) {
+					temp = temp->left;
+				}
+				temp->left  = leftNode;
+				temp->right = NULL;  // Not sure if this is correct
 				leftNode = thisOpNode;
 			}
-		}
-		// Have to do this cause the last "thisOpNode" could have been NULL
-		thisOpNode = leftNode;
+		} 
 		break;
 
 	case(AST_INT):
-		thisOpNode->code = dcg_MOV;
-		thisOpNode->resultReg = popReg(codeGen);
+		thisOpNode->code = dcg_none;
 		thisOpNode->ast_node = currentASTNode;
-
+		/*
+		*	Going to keep this commented out for now, don't think we need it
+		//thisOpNode->resultReg = popReg(codeGen);
+		thisOpNode->ast_node->asmOpNode = thisOpNode;
+		thisOpNode->arg_struct->OpArg1.arg_reg = popReg(codeGen);
+		thisOpNode->arg_struct->OpArg2.arg_int = thisOpNode->ast_node->int_literal;
+		setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_REG, dcg_OpCodeArgType_LIT);
+		*/
 		break;
+
+	case(AST_IDENT):
+		// Check the symbol table to see if IDENT exists
+		thisOpNode->code = dcg_MOV;
+		//thisOpNode->resultReg = popReg(codeGen);
+		thisOpNode->ast_node = currentASTNode;
+		thisOpNode->ast_node->asmOpNode = thisOpNode;
+		// this will point to a string in a AST_Node
+		thisOpNode->arg_struct->OpArg1.arg_reg = popReg(codeGen);
+		thisOpNode->arg_struct->OpArg2.arg_var = thisOpNode->ast_node->identName;
+		setSymbolReg(codeGen->parser->table, thisOpNode->ast_node->identName, thisOpNode->ast_node->nameLength, thisOpNode->arg_struct->OpArg1.arg_reg);
+		setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_REG, dcg_OpCodeArgType_STACKOFF);
+
+		// TODO: eventually check if parent node ( or from the =, change the child), so this doesn't
+		// produce any instructions if only being used in a = expression
+		break;
+
 	case(AST_BIOP):
 
-		// Set the Register for where the result goes
-		thisOpNode->resultReg = dcg_none;
-
 		// Get the children
+		// !! The left and right nodes should contain information about 
+		// the location (literal, stack offset, reg) of their respective AST_Node !!
 		thisOpNode->left     = buildOpTree(codeGen, dd_get(currentASTNode->children, 0), level + 1);
 		thisOpNode->right    = buildOpTree(codeGen, dd_get(currentASTNode->children, 1), level + 1);
 
 		// Set the other attributes
 		thisOpNode->code = dcg_MOV;
 		thisOpNode->ast_node = currentASTNode;
+		thisOpNode->ast_node->asmOpNode = thisOpNode;
 
-		// If this binary operator is operating on two intergers, just calculate it and replace biop
-		// in AST with the new INT literal
+		/*
+		*	If this binary operator is operating on two intergers, just calculate it and replace biop
+		*	in AST with the new INT literal
+		*
+		*	TODO: This should be done in the parser, I think
+		*/
 		if (thisOpNode->left->ast_node->type == AST_INT && thisOpNode->right->ast_node->type == AST_INT) {
 
 			thisOpNode->ast_node->type = AST_INT;
+			// Don't need an opcode because nothing needs to happen
+			// Assuming the parent (BIOP or something else) is going to deal with this AST_node directly
+			thisOpNode->code = dcg_none;
 
 			switch (currentASTNode->token->type) {
 			case(dl_PLUS):
@@ -157,52 +287,173 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int 
 				exit(1);
 				return NULL;
 			}
-			thisOpNode->ast_node->type = AST_INT;
-			pushReg(codeGen, thisOpNode->right->resultReg);
-			pushReg(codeGen, thisOpNode->left->resultReg);
+
+			// Don't need the children nodes because we replaced them with this node
 			freeOpNode(codeGen, &(thisOpNode->left));
 			freeOpNode(codeGen, &(thisOpNode->right));
 
 		}
+
 		// else, create a OpNode for the BIOP
 		else {
+			
+			/*
+			*	These BIOPs look at there children in the AST to decide what to do
+			*
+			*	'=' Biop specificly looks for a register associated with its left child in the AST
+			*	to store the varible into
+			*
+			*/
 
+			// These all looked the same, so I used a goto
+			// I know it's taboo, but it looks cleaner here
+			// If I realize a better solution, I will use it, but for now, this seems ok
 			switch (currentASTNode->token->type) {
 			case(dl_PLUS):
 				thisOpNode->code = dcg_ADD;
-				break;
+				goto general_arithmatic_biop;
 			case(dl_MINUS):
 				thisOpNode->code = dcg_SUB;
-				break;
+				goto general_arithmatic_biop;
 			case(dl_MULT):
 				thisOpNode->code = dcg_MUL;
-				break;
+				goto general_arithmatic_biop;
 			case(dl_DIVIDE):
 				thisOpNode->code = dcg_DIV;
+
+				// All Biop statements so far lead here:
+				general_arithmatic_biop:
+
+				// Our left and right AST_Nodes can't both be literals because of the precomputation above
+				// Check both our right and left children in the AST, find a variable with a register to use as first arg
+				left_side_AST_node = dd_get(thisOpNode->ast_node->children, 0);
+				right_side_AST_node = dd_get(thisOpNode->ast_node->children, 1);
+
+				// If the left node is the one we can store our value into
+				if ((left_side_AST_node->asmOpNode->arg_struct->arg_types & 0x0F) == dcg_OpCodeArgType_REG) {
+
+					// Set first arg
+					thisOpNode->arg_struct->OpArg1.arg_reg = left_side_AST_node->asmOpNode->arg_struct->OpArg1.arg_reg;
+					setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_REG, dcg_OpCodeArgType_NONE);
+
+					// Set second arg
+					switch (right_side_AST_node->type) {
+					case(AST_INT):
+
+						// Directly use the int_literal from the AST_INT node
+
+						setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_LIT);
+						thisOpNode->arg_struct->OpArg2.arg_int = right_side_AST_node->int_literal; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+						break;
+
+					case(AST_IDENT):
+					case(AST_BIOP):
+					{
+
+						// Find the storage register for the right AST_Node
+						switch ((right_side_AST_node->asmOpNode->arg_struct->arg_types) & 0x0F) {
+						case(dcg_OpCodeArgType_REG):
+							thisOpNode->arg_struct->OpArg2.arg_reg = right_side_AST_node->asmOpNode->arg_struct->OpArg1.arg_reg;
+							setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_REG);
+							pushUsedReg(codeGen, right_side_AST_node->asmOpNode);
+							break;
+						default:
+							printf("CodeGen: Error, I don't know what to do with this Op arg when generating code for '+'\n");
+							break;
+						}
+					}
+						break;
+
+					default:
+						printf("CodeGen: Error Dont know how to add these AST + Children\n");
+						break;
+					}
+							
+				}
+
+				// If the right node is the one we can store our value into
+				else if ((right_side_AST_node->asmOpNode->arg_struct->arg_types & 0x0F) == dcg_OpCodeArgType_REG){
+				
+					// Set first arg
+					d_symbol* rightSymbol = getSymbol(codeGen->parser->table, right_side_AST_node->identName, right_side_AST_node->nameLength);
+					setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_STACKOFF, dcg_OpCodeArgType_NONE);
+					thisOpNode->arg_struct->OpArg1.arg_var = rightSymbol->symbol_name; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+
+					// Set second arg
+					switch (left_side_AST_node->type) {
+
+					// Don't check other AST types because they would've been caught in the earlier if checking for a REG to store into
+					case(AST_INT):
+
+						setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_LIT);
+						thisOpNode->arg_struct->OpArg2.arg_int = right_side_AST_node->int_literal; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+						break;
+
+					default:
+						printf("CodeGen: Error Dont know how to add these AST + Children\n");
+						break;
+					}
+				}
 				break;
+
+			case(dl_EQUALS):
+
+				// First ARG of the mov op
+				// Assume left side of = is a symbol in the symbol table
+				left_side_AST_node = dd_get(thisOpNode->ast_node->children, 0);
+				d_symbol* leftSymbol = getSymbol(codeGen->parser->table, left_side_AST_node->identName, left_side_AST_node->nameLength);
+				setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_STACKOFF, dcg_OpCodeArgType_NONE);
+				thisOpNode->arg_struct->OpArg1.arg_var = leftSymbol->symbol_name; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+				
+
+				// Second ARG of the mov op
+				right_side_AST_node = dd_get(thisOpNode->ast_node->children, 1);
+				switch (right_side_AST_node->type) {
+				case(AST_INT):
+
+					// Directly use the int_literal from the AST_INT node
+					setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_LIT);
+					thisOpNode->arg_struct->OpArg2.arg_int = right_side_AST_node->int_literal; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+					break;
+
+				case(AST_IDENT):
+				case(AST_BIOP):
+					{
+						// Get the register that the final value of the right AST node was stored in
+						switch ((right_side_AST_node->asmOpNode->arg_struct->arg_types) & 0x0F) {
+
+						case(dcg_OpCodeArgType_REG):
+							thisOpNode->arg_struct->OpArg2.arg_reg = right_side_AST_node->asmOpNode->arg_struct->OpArg1.arg_reg;
+							setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_REG);
+							break;
+
+						default:
+							printf("CodeGen: Error, I don't know what to do with this Op arg when generating code for '='\n");
+							break;
+						}
+					}
+
+				break;
+				}
+
+			break;
+
+			// Dont recognize this AST BIOP
 			default:
 				fprintf(stderr, "CodeGen: Illegal BIOP Lexeme");
 				exit(1);
 				return NULL;
 			}
-			pushReg(codeGen, thisOpNode->right->resultReg);
-			pushReg(codeGen, thisOpNode->left->resultReg);
 		} 
-		// Assign a register for the result
-		// Dont need the childrens registers anymore (since theyre just literals)
-		// so we can push them back on, then pop one off for the biop
-		thisOpNode->resultReg = popReg(codeGen);
-
-		break;
-
-	case(AST_IDENT):
-		free(thisOpNode);
-		thisOpNode = NULL;
+		
 		break;
 	}
 	return thisOpNode;
 }
 
+/*
+*	Pass in a Register to get printed out to the file
+*/
 void appendReg(code_generator* codeGen, dcg_Reg Reg1) {
 	switch (Reg1) {
 	case(dcg_rax):
@@ -303,6 +554,10 @@ void appendReg(code_generator* codeGen, dcg_Reg Reg1) {
 		break;
 	}
 }
+
+/*
+*	Pass in a x64 asm OP to get printed out to the file
+*/
 void appendOp(code_generator* codeGen, dcg_OpCode opCode) {
 	switch (opCode) {
 	case(dcg_MOV):
@@ -315,7 +570,7 @@ void appendOp(code_generator* codeGen, dcg_OpCode opCode) {
 		d_appendString(codeGen->fileState, "sub   ");
 		break;
 	case(dcg_MUL):
-		d_appendString(codeGen->fileState, "mul   ");
+		d_appendString(codeGen->fileState, "imul   ");
 		break;
 	case(dcg_DIV):
 		d_appendString(codeGen->fileState, "div   ");
@@ -367,6 +622,112 @@ void appendLineEndInt(code_generator* codeGen, dcg_OpCode opCode, dcg_Reg Reg1, 
 	d_appendString(codeGen->fileState, "\n");
 }
 
+void appendLineEndIdent(code_generator* codeGen, dcg_OpCode opCode, dcg_Reg Reg1, const char* arg2) {
+	appendOp(codeGen, opCode);
+	if (Reg1 != dcg_none) {
+		appendReg(codeGen, Reg1);
+	}
+	else {
+		fprintf(stderr, "Reg1 cant be none in appendLineEndInt\n");
+		exit(1);
+		return;
+	}
+	if (arg2 != NULL) {
+		d_appendString(codeGen->fileState, ", ");
+		d_appendString(codeGen->fileState, "[rbx-");
+		d_appendString(codeGen->fileState, arg2);
+		d_appendString(codeGen->fileState, "]");
+		d_appendString(codeGen->fileState, "\n");
+	}
+	else {
+		fprintf(stderr, "art2 cant be NULL in appendLineEndIdent\n");
+		exit(1);
+		return;
+	}
+}
+
+void appendStackOffset(code_generator* codeGen, dcg_OpCode opCode, dcg_Reg Reg1, const char* arg2) {
+	appendOp(codeGen, opCode);
+	if (Reg1 != dcg_none) {
+		appendReg(codeGen, Reg1);
+	}
+	else {
+		fprintf(stderr, "Reg1 cant be none in appendLineEndInt\n");
+		exit(1);
+		return;
+	}
+	if (arg2 != NULL) {
+		d_appendString(codeGen->fileState, ", ");
+		d_appendString(codeGen->fileState, "DWORD PTR ");   // TODO: THIS IS A TYPE THING, WILL CHANGE DEPENDING ON VAR SIZE
+		d_appendString(codeGen->fileState, arg2);
+		d_appendString(codeGen->fileState, "[rbp]");
+		d_appendString(codeGen->fileState, "\n");
+	}
+	else {
+		fprintf(stderr, "art2 cant be NULL in appendLineEndIdent\n");
+		exit(1);
+		return;
+	}
+}
+
+
+/*
+*	Take an opnode and print it out to the file
+*	Prints the x64 ASM Operator and its arguments if any
+*/
+void appendOpLine(code_generator* codeGen, OpTreeNode* node) {
+	appendOp(codeGen, node->code);
+
+	// First arg
+	switch ((node->arg_struct->arg_types) & 0x0F) {
+	case(dcg_OpCodeArgType_REG):
+		if (node->arg_struct->OpArg1.arg_reg != dcg_none) {
+			appendReg(codeGen, node->arg_struct->OpArg1.arg_reg);
+		}
+		break;
+	case(dcg_OpCodeArgType_STACKOFF):
+		if (node->arg_struct->OpArg1.arg_var != NULL) {
+			//d_appendString(codeGen->fileState, ", ");
+			d_appendString(codeGen->fileState, "DWORD PTR ");   // TODO: THIS IS A TYPE THING, WILL CHANGE DEPENDING ON VAR SIZE
+			d_appendString(codeGen->fileState, node->arg_struct->OpArg1.arg_var);
+			d_appendString(codeGen->fileState, "[rbp]");
+		}
+		break;
+	default:
+		printf("Code Gen: Error, Dont know how to handle this first arg for an OP");
+		break;
+	}
+
+	// Second arg
+	switch (((node->arg_struct->arg_types) & 0xF0) >> 4) {
+	case(dcg_OpCodeArgType_NONE):
+		break;
+	case(dcg_OpCodeArgType_LIT):
+		d_appendString(codeGen->fileState, ", ");
+		d_appendInt(codeGen->fileState, node->arg_struct->OpArg2.arg_int);	// TODO: THIS IS A TYPE THING, WILL CHANGE DEPENDING ON TYPE
+		break;
+	case(dcg_OpCodeArgType_REG):
+		if (node->arg_struct->OpArg2.arg_reg != dcg_none) {
+			d_appendString(codeGen->fileState, ", ");
+			appendReg(codeGen, node->arg_struct->OpArg2.arg_reg);
+		}
+		break;
+	case(dcg_OpCodeArgType_STACKOFF):
+		if (node->arg_struct->OpArg2.arg_var != NULL) {
+			d_appendString(codeGen->fileState, ", ");
+			d_appendString(codeGen->fileState, "DWORD PTR ");   // TODO: THIS IS A TYPE THING, WILL CHANGE DEPENDING ON VAR SIZE
+			d_appendString(codeGen->fileState, node->arg_struct->OpArg2.arg_var);
+			d_appendString(codeGen->fileState, "[rbp]");
+		}
+		break;
+	default:
+		printf("Code Gen: Error, Dont know how to handle this second arg for an OP");
+		break;
+	}
+
+	d_appendString(codeGen->fileState, "\n");
+}
+
 void printHeader(code_generator* codeGen) {
 	/*
 	const char * header = "extrn ExitProcess: PROC   ; external functions in system libraries\n"
@@ -395,11 +756,21 @@ void printBeginningOfScope(code_generator* codeGen) {
 					   "sub   rsp, ";
 
 	d_appendString(codeGen->fileState, bos);
-	d_appendInt(codeGen->fileState, codeGen->stack_offset);
+	d_appendInt(codeGen->fileState, codeGen->parser->table->stack_offset);
+	d_appendString(codeGen->fileState, "\n");
+}
+
+void printEndOfScope(code_generator* codeGen) {
+
+	const char* eos  = "add  rsp, ";
+
+	d_appendString(codeGen->fileState, eos);
+	d_appendInt(codeGen->fileState, codeGen->parser->table->stack_offset);
 	d_appendString(codeGen->fileState, "\n");
 }
 
 void printFooter(code_generator* codeGen) {
+
 	const char * footer = //"mov   rcx, rax    ; Stores the result\n"
 					      "call ExitProcess\n"
 		                  "Start ENDP\n"
@@ -408,60 +779,39 @@ void printFooter(code_generator* codeGen) {
 	d_appendString(codeGen->fileState, footer);
 }
 
+/*
+*	Given an OpTree node, this function recursivley writes its children, then the root node to a file
+*/
 void writeOpTree(code_generator * codeGen, OpTreeNode * node) {
+
+	// Recursively write children
 	if(node->left != NULL)
 		writeOpTree(codeGen, node->left);
 	if(node->right != NULL)
 		writeOpTree(codeGen, node->right);
 
+	// Depending on the OpCode of the OpTree Node, do specific things
 	switch (node->code) {
-	case(dcg_MOV):
-		// If were just moving an int literal into a register
-		// This node could have children, this is because a BIOP node could've had both children been literal
-		// so just evaluating the expression at compile time in the buildOpTree function. The children were not removed,
-		// the biop AST_Node's type was just changed to AST_INT
-		
 
-		// NOTE: This may need to be moved down eventually. This is do ADD/SUB can do something like:
-		// add  rax, 2
-		// Dont think that can be done right now
-		if (node->ast_node->type == AST_INT) {
-			appendLineEndInt(codeGen, node->code, node->resultReg, node->ast_node->int_literal);
-			break;
-		}
+	case(dcg_DIV):
+
+		// TODO: Division is currently broken, need to fix
+		appendLineEndReg(codeGen, dcg_XOR, dcg_edx, dcg_edx); // TODO: this really needs to be moved to buildOpTree
+
+	case(dcg_MOV):
 	case(dcg_ADD):
 	case(dcg_SUB):
-		if (node->left->resultReg == node->resultReg) {
-			// EX: ADD rax, r10  ; Code: 1+2;
-			appendLineEndReg(codeGen, node->code, node->resultReg, node->right->resultReg);
-		}
-		else {
-			appendLineEndReg(codeGen, node->code, node->left->resultReg, node->right->resultReg);
-			appendLineEndReg(codeGen, dcg_MOV, node->resultReg, node->left->resultReg);
-		}
-		break;
-	
-	case(dcg_DIV):
-		// zero edx register
-		appendLineEndReg(codeGen, dcg_XOR, dcg_edx, dcg_edx);
 	case(dcg_MUL):
-		if (node->left->resultReg == node->resultReg) {
-			// EX: ADD rax, r10  ; Code: 1+2;
-			appendLineEndReg(codeGen, node->code, node->resultReg, node->right->resultReg);
-		}
-		else {
-			appendLineEndReg(codeGen, node->code, node->left->resultReg, node->right->resultReg);
-			appendLineEndReg(codeGen, dcg_MOV, node->resultReg, node->left->resultReg);
-		}
+
+		// Just append the node
+		appendOpLine(codeGen, node);
 		break;
 	}
-
 }
 
-void print_local_var_offset_definition(code_generator* codeGen, const char * var_name, unsigned int var_size) {
+void print_local_var_offset_definition(code_generator* codeGen, const char * var_name, unsigned int stack_offset) {
 	d_appendString(codeGen->fileState, var_name);
-	d_appendString(codeGen->fileState, " = DWORD PTR ");
-	codeGen->stack_offset += var_size;
+	d_appendString(codeGen->fileState, " = ");
 	// This number will determine the amount of variables you can have
 	/*
 	char* num = calloc(10, sizeof(char));
@@ -470,33 +820,85 @@ void print_local_var_offset_definition(code_generator* codeGen, const char * var
 	sprintf_s(num, (size_t)ceil(log10((double)var_size + 1)) + 1, "%u", codeGen->stack_offset);
 	d_appendString(codeGen->fileState, num);
 	*/
-	d_appendInt(codeGen->fileState, var_size);
+	d_appendString(codeGen->fileState, "-");
+	d_appendInt(codeGen->fileState, stack_offset);
 	d_appendString(codeGen->fileState, "\n");
 }
 
 void DefineLocalVars(code_generator* codeGen) {
-	for (int i = 0; i < codeGen->parser->table->d_array->size; i++) {
+	for (unsigned int i = 0; i < codeGen->parser->table->d_array->size; i++) {
 		d_symbol* symbol = dd_get(codeGen->parser->table->d_array, i);
 		if (symbol->type == dtype_INT) {
-			print_local_var_offset_definition(codeGen, symbol->symbol_name, 4);
+			print_local_var_offset_definition(codeGen, symbol->symbol_name, symbol->stack_offset);
 		}
 	}
 }
 
 void GenCodeFromAST(code_generator* codeGen, AST_Node * currentNode) {
+
 	// Build an op tree from the AST
 	codeGen->OpTree_Root = buildOpTree(codeGen, currentNode, 0);
+
 	// Write op tree to output file
 	writeOpTree(codeGen, codeGen->OpTree_Root);
+
 	// mov the value in the last used register into the return code register
-	appendLineEndReg(codeGen, dcg_MOV, dcg_ecx, codeGen->OpTree_Root->resultReg);
+	// THIS ISN'T CORRECT, JUST FOR NOW / TILL I MAKE A RETURN KEYWORD !!!!!!!!!!!!!
+
+	// First arg
+	switch ((codeGen->OpTree_Root->arg_struct->arg_types) & 0x0F) {
+	case(dcg_OpCodeArgType_REG):
+		appendLineEndReg(codeGen, dcg_MOV, dcg_ecx, codeGen->OpTree_Root->arg_struct->OpArg1.arg_reg);
+		break;
+	case(dcg_OpCodeArgType_STACKOFF):
+		appendStackOffset(codeGen, dcg_MOV, dcg_ecx, codeGen->OpTree_Root->arg_struct->OpArg1.arg_var);
+		break;
+	default:
+		printf("Code Gen: Error, Dont know how to finish this function");
+		break;
+	}
 }
 
 void GenerateCode(code_generator* codeGen) {
+	/*
+	extrn ExitProcess: PROC   ; external functions in system libraries
+	.code
+	*/
 	printHeader(codeGen);
+
+	/*
+	Start PROC
+	*/
 	printStartProc(codeGen);
+
+	/*
+	i = -4
+	*/
 	DefineLocalVars(codeGen);
+
+	/*
+	push  rbp
+	mov   rbp, rsp
+	sub   rsp, 4
+	*/
 	printBeginningOfScope(codeGen);
+
+	/*
+	   Pass in root of AST
+	   recursivly build OpTree from AST
+	   recursivly write OpTree
+	*/
 	GenCodeFromAST(codeGen, codeGen->parser->ast_root);
+
+	/*
+	add  rsp, 16
+	*/
+	printEndOfScope(codeGen);
+
+	/*
+	call ExitProcess
+	Start ENDP
+	END
+	*/
 	printFooter(codeGen);
 }

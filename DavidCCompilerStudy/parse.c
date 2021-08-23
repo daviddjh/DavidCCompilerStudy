@@ -101,7 +101,8 @@ AST_Node* parseIdentity(Parser* parser) {
         root->type = AST_IDENT;
         root->nameLength = parser->currentToken->lexeme_length;
         root->identName = malloc(sizeof(char) * root->nameLength);
-        memcpy(root->identName, parser->currentToken->lexeme, root->nameLength);
+		// + 1 for \0
+        memcpy(root->identName, parser->currentToken->lexeme, root->nameLength + 1);
         eatNextToken(parser->lexer);
         parser->currentToken = peakNextToken(parser->lexer);
         if (parser->currentToken->type == dl_EQUALS) {
@@ -134,8 +135,9 @@ AST_Node* parseIdentDeclare(Parser* parser) {
 			root->token = parser->currentToken;
 			root->type = AST_IDENT;
 			root->nameLength = parser->currentToken->lexeme_length;
-			root->identName = malloc(sizeof(char) * root->nameLength);
-			memcpy(root->identName, parser->currentToken->lexeme, root->nameLength);
+			root->identName = calloc(root->nameLength, sizeof(char));
+            // + 1 for \0
+			memcpy(root->identName, parser->currentToken->lexeme, root->nameLength + 1);
             if (addSymbol(parser->table, dtype_INT, root->identName, root->nameLength) == FALSE) {
                 fprintf(stderr, "The identity being declared on line %u has already been declared\n", parser->currentToken->lineno);
                 exit(1);

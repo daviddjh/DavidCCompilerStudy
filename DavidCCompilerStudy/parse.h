@@ -6,6 +6,9 @@
 #include "dcommon.h"
 #include "symbol.h"
 
+// Forward declaration of OpTreeNode from codeGen for AST_Node
+typedef struct OpTreeNode OpTreeNode;
+
 typedef enum AST_Type {
 	AST_PROG, // Dont think i need this
 	AST_BLOCK,
@@ -25,6 +28,7 @@ typedef struct AST_Node {
 	// change this to identNameLength
 	int nameLength;
 	char* identName;
+	OpTreeNode* asmOpNode;
 } AST_Node;
 
 typedef struct Parser {

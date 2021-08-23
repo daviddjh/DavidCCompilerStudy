@@ -1,8 +1,9 @@
+#pragma once
 #include "parse.h"
 #include "dinput.h"
 #include "dynarray.h"
 
-typedef enum {
+typedef enum dcg_Reg {
 	dcg_rax	  = 0,
 	dcg_rbx	  = 1,
 	dcg_rcx	  = 2,
@@ -55,12 +56,31 @@ typedef enum {
 	dcg_NOP
 } dcg_OpCode;
 
+typedef enum {
+	dcg_OpCodeArgType_NONE       = 0x00u,
+	dcg_OpCodeArgType_LIT		 = 0x01u,
+	dcg_OpCodeArgType_REG		 = 0x02u,
+	dcg_OpCodeArgType_STACKOFF   = 0x04u,
+}dcg_OpCodeArgType;
+
+typedef union OpArgs {
+	dcg_Reg arg_reg;
+	int arg_int;
+	char* arg_var;
+} OpArgs;
+	
+typedef struct {
+	unsigned char arg_types;
+	OpArgs OpArg1;
+	OpArgs OpArg2;
+} dcg_ArgStruct;
+
 typedef struct OpTreeNode{
 	struct OpTreeNode* left;
 	struct OpTreeNode* right;
 	dcg_OpCode         code;
 	AST_Node*          ast_node;
-	dcg_Reg            resultReg;
+	dcg_ArgStruct*     arg_struct;
 } OpTreeNode;
 
 typedef struct code_generator {

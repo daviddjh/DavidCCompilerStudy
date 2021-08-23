@@ -37,7 +37,12 @@ void* dd_free(DynamicArray* dynarray) {
 }
 
 void* dd_get(DynamicArray* dynarray, uint32_t index) {
-	return dynarray->array[index];
+	if (index <= dynarray->size) {
+		return dynarray->array[index];
+	}
+	else {
+		return NULL;
+	}
 }
 
 void dd_set(DynamicArray* dynarray, uint32_t index, void * newItem) {
