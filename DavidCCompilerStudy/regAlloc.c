@@ -4,55 +4,71 @@
 void initRegAlloc(RegAlloc* regAlloc){
 
   for(int i = 0; i < dcg_COUNT; i++){
-    regAlloc->regArray[i] = {0};
+    regAlloc->regArray[i] = NULL;
     //regAlloc->regArray[i] = NULL;
   }
 }
 
-dcg_Reg getReg(RegAlloc* regAlloc, dcg_Reg reg, OpTreeNode* node){
+dcg_Reg getReg(RegAlloc* regAlloc, dcg_Reg reg, OpTreeNode* node) {
 
-  if( reg != dcg_none){
+	if (reg != dcg_none) {
 
-    if(reg < dcg_COUNT && reg >= 0){
+		if (reg < dcg_COUNT && reg >= 0) {
 
-      if(regAlloc->regArray[reg] != NULL){
+			if (regAlloc->regArray[reg] != NULL) {
 
-        // This register is already allocated, so it needs to be moved
+				OpTreeNode* nodeWithOurReg = regAlloc->regArray[reg];
 
-        // Create move op to move register contents
-        OpTreeNode* movNode = malloc(sizeof(OpTreeNode));
-        movNode->left        = NULL;
-        movNode->right       = NULL;
-        movNode->dcg_OpCode  = dcg_MOV; 
-        movNode->ast_node    = regAlloc->regArray[reg]->ast_node;     // IDK what this should be?
-        movNode->arg_struct  = malloc(sizeof(dcg_ArgStruct));
+				// This register is already allocated, so it needs to be moved
 
-        movNode->arg_struct->arg_types      = 0;
-        movNode->arg_struct->arg_types     |= dcg_OpCodeArgType_REG;
-        movNode->arg_struct->arg_types     |= (dcg_OpCodeArgType_REG << 4);
-        movNode->arg_struct->OpArg1.arg_reg = getReg(regAlloc, dcg_none, regAlloc->regArray[reg]);
-        movNode->arg_struct->OpArg2.arg_reg = reg;
+				// Create move op to move register contents
 
-        
+				OpTreeNode* movNode = malloc(sizeof(OpTreeNode));
+				movNode->left = NULL;
+				movNode->right = NULL;
+				movNode->parent = NULL;
+				movNode->code = dcg_MOV;
+				movNode->ast_node = regAlloc->regArray[reg]->ast_node;     // IDK what this should be?
+				movNode->arg_struct = malloc(sizeof(dcg_ArgStruct));
 
+				movNode->arg_struct->arg_types = 0;
+				movNode->arg_struct->arg_types |= dcg_OpCodeArgType_REG;
+				movNode->arg_struct->arg_types |= (dcg_OpCodeArgType_REG << 4);
+				//movNode->arg_struct->OpArg1.arg_reg = getReg(regAlloc, dcg_none, regAlloc->regArray[reg]);
+				movNode->arg_struct->OpArg1.arg_reg = getReg(regAlloc, dcg_none, movNode);
+				movNode->arg_struct->OpArg2.arg_reg = reg;
 
-        return reg;
+				// Place movNode inbetween the node with our register and it's parent
+				if (nodeWithOurReg->parent != NULL) {
+					movNode->parent = nodeWithOurReg->parent;
+					nodeWithOurReg->parent = movNode;
+					if (movNode->parent->left == nodeWithOurReg) {
+						movNode->parent->left = movNode;
+					}
+					else {
+						movNode->parent->right = movNode;
+					}
+					movNode->left = nodeWithOurReg;
+				}
 
-      } else {
+				return reg;
+			}
+			else {
 
-        // This register isn't allcated, so just set it and return it
-        regAlloc->regArray[reg] = node;
-        return reg;
+				// This register isn't allcated, so just set it and return it
+				regAlloc->regArray[reg] = node;
+				return reg;
 
-      }
-    } else {
-    
-      // The register was out of the range of registers available
-      printf("RegAlloc: Error, Trying to allocate invalid register, exiting");
-      exit(1);
+			}
+		}
+		else {
 
-    }
-  }
+			// The register was out of the range of registers available
+			printf("RegAlloc: Error, Trying to allocate invalid register, exiting");
+			exit(1);
+
+		}
+	}
   // Node doens't need to allocate a specific node, 
   
   // For now, just allocate General use 32bit registers

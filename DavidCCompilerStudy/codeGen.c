@@ -9,6 +9,7 @@
 #include "symbol.h"
 #include "dynarray.h"
 #include "dinput.h"
+#include "regAlloc.h"
 
 void pushReg(code_generator* codeGen, dcg_Reg reg) {
 	dcg_Reg* tempReg = malloc(sizeof(dcg_Reg));  // Dont know if this is right
@@ -74,6 +75,7 @@ void InitCodeGen(code_generator* codeGen, Parser* parser) {
 	codeGen->OpTree_Root = NULL;
 	codeGen->regStack = dd_makeDynamicArray();
 	codeGen->stack_offset = 0;
+	codeGen->regAlloc = malloc(sizeof(RegAlloc));
 	// Fill stack of registers cause all of them are for use
 	// Push First temp Register
 	// Push other temp Registers
@@ -169,7 +171,7 @@ void setArgTypes(unsigned char *arg_types, dcg_OpCodeArgType arg1, dcg_OpCodeArg
 * Nodes to be written to a .asm file in Post Order Traversal
 * The level parameter keeps track of the level within the binary tree
 */
-OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int level) {
+OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTreeNode* parent, int level) {
 	AST_Node * nextASTNode;
 	OpTreeNode* thisOpNode = malloc(sizeof(OpTreeNode));
 	AST_Node* left_side_AST_node;
@@ -177,6 +179,7 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int 
 
 	thisOpNode->left                  = NULL;
 	thisOpNode->right                 = NULL;
+	thisOpNode->parent                = parent;
 	thisOpNode->code                  = dcg_NOP;
 	thisOpNode->ast_node              = NULL;
 	thisOpNode->arg_struct            = malloc(sizeof(dcg_ArgStruct));
@@ -193,7 +196,7 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int 
 			// I think we can release all registers after each expression?
 			// Basicaly make a linked list of OpNodes in order
 			AST_Node* childNode = (AST_Node*)dd_get(currentASTNode->children, i);
-			thisOpNode = buildOpTree(codeGen, childNode, level + 1);
+			thisOpNode = buildOpTree(codeGen, childNode, thisOpNode, level + 1);
 			resetRegs(codeGen);
 
 			// Need to traverse all the way down the left side to place node
@@ -229,7 +232,8 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int 
 		thisOpNode->ast_node = currentASTNode;
 		thisOpNode->ast_node->asmOpNode = thisOpNode;
 		// this will point to a string in a AST_Node
-		thisOpNode->arg_struct->OpArg1.arg_reg = popReg(codeGen);
+		//thisOpNode->arg_struct->OpArg1.arg_reg = popReg(codeGen);
+		thisOpNode->arg_struct->OpArg1.arg_reg = getReg(codeGen->regAlloc, dcg_none, thisOpNode);
 		thisOpNode->arg_struct->OpArg2.arg_var = thisOpNode->ast_node->identName;
 		setSymbolReg(codeGen->parser->table, thisOpNode->ast_node->identName, thisOpNode->ast_node->nameLength, thisOpNode->arg_struct->OpArg1.arg_reg);
 		setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_REG, dcg_OpCodeArgType_STACKOFF);
@@ -243,8 +247,8 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int 
 		// Get the children
 		// !! The left and right nodes should contain information about 
 		// the location (literal, stack offset, reg) of their respective AST_Node !!
-		thisOpNode->left     = buildOpTree(codeGen, dd_get(currentASTNode->children, 0), level + 1);
-		thisOpNode->right    = buildOpTree(codeGen, dd_get(currentASTNode->children, 1), level + 1);
+		thisOpNode->left     = buildOpTree(codeGen, dd_get(currentASTNode->children, 0), thisOpNode, level + 1);
+		thisOpNode->right    = buildOpTree(codeGen, dd_get(currentASTNode->children, 1), thisOpNode, level + 1);
 
 		// Set the other attributes
 		thisOpNode->code = dcg_MOV;
@@ -317,9 +321,6 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int 
 				goto general_arithmatic_biop;
 			case(dl_MULT):
 				thisOpNode->code = dcg_MUL;
-				goto general_arithmatic_biop;
-			case(dl_DIVIDE):
-				thisOpNode->code = dcg_DIV;
 
 				// All Biop statements so far lead here:
 				general_arithmatic_biop:
@@ -394,6 +395,18 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, int 
 						break;
 					}
 				}
+				break;
+
+			case(dl_DIVIDE):
+				thisOpNode->code = dcg_DIV;
+				// Get eax
+				// Get edx
+				// Zero edx
+				// Left child (Dividend) goes in eax
+				// This OpNodes only argument is it's right child
+				// Quotient gets stored in eax ( But this conflicts with how parents grab arguments from their children )
+				// Maybe storage register should be determined by searching the register allocator?!!!
+
 				break;
 
 			case(dl_EQUALS):
@@ -542,7 +555,7 @@ void appendReg(code_generator* codeGen, dcg_Reg Reg1) {
 		break;
 	case(dcg_r12d):
 		d_appendString(codeGen->fileState, "r12d");
-		break;
+		break; 
 	case(dcg_r13d):
 		d_appendString(codeGen->fileState, "r13d");
 		break;
@@ -797,6 +810,8 @@ void writeOpTree(code_generator * codeGen, OpTreeNode * node) {
 
 		// TODO: Division is currently broken, need to fix
 		appendLineEndReg(codeGen, dcg_XOR, dcg_edx, dcg_edx); // TODO: this really needs to be moved to buildOpTree
+		appendOpLine(codeGen, node);
+		break;
 
 	case(dcg_MOV):
 	case(dcg_ADD):
@@ -837,7 +852,7 @@ void DefineLocalVars(code_generator* codeGen) {
 void GenCodeFromAST(code_generator* codeGen, AST_Node * currentNode) {
 
 	// Build an op tree from the AST
-	codeGen->OpTree_Root = buildOpTree(codeGen, currentNode, 0);
+	codeGen->OpTree_Root = buildOpTree(codeGen, currentNode, NULL, 0);
 
 	// Write op tree to output file
 	writeOpTree(codeGen, codeGen->OpTree_Root);
