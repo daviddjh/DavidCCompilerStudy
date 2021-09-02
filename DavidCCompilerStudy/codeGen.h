@@ -78,16 +78,20 @@ typedef struct {
 typedef struct OpTreeNode{
 	struct OpTreeNode* left;
 	struct OpTreeNode* right;
+	struct OpTreeNode* parent;
 	dcg_OpCode         code;
 	AST_Node*          ast_node;
 	dcg_ArgStruct*     arg_struct;
 } OpTreeNode;
+
+typedef struct RegAlloc RegAlloc;
 
 typedef struct code_generator {
 	Parser* parser;
 	d_file* fileState;
 	OpTreeNode* OpTree_Root;
 	DynamicArray * regStack;
+	RegAlloc* regAlloc;
 	unsigned int stack_offset;
 } code_generator;
 

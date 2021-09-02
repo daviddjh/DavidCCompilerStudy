@@ -42,6 +42,9 @@
     <ClCompile Include="symbol.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="regAlloc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug.h">
@@ -72,6 +75,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="symbol.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="regAlloc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
