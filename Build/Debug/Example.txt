@@ -1,2 +1,4 @@
-int i = 12;
-int j = i / 6;
+int i = 2;
+int l = 6;
+int k = 10 - i;
+int j = 5 - l / i - i + 1;

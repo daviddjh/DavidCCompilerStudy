@@ -240,7 +240,7 @@ AST_Node *parseExpression(Parser* parser, int pres, AST_Node* left) {
       default:
         root = malloc(sizeof(AST_Node));
         root->type = AST_UNKNOWN;
-        root->token = eatNextToken(parser->currentToken);
+        root->token = eatNextToken(parser->lexer);
     }
     
     // Set left to root so next node can use it

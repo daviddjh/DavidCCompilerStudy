@@ -76,6 +76,7 @@ void InitCodeGen(code_generator* codeGen, Parser* parser) {
 	codeGen->regStack = dd_makeDynamicArray();
 	codeGen->stack_offset = 0;
 	codeGen->regAlloc = malloc(sizeof(RegAlloc));
+	initRegAlloc(codeGen->regAlloc);
 	// Fill stack of registers cause all of them are for use
 	// Push First temp Register
 	// Push other temp Registers
@@ -176,6 +177,8 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 	OpTreeNode* thisOpNode = malloc(sizeof(OpTreeNode));
 	AST_Node* left_side_AST_node;
 	AST_Node* right_side_AST_node;
+	dcg_Reg rightReg;
+	dcg_Reg leftReg;
 
 	thisOpNode->left                  = NULL;
 	thisOpNode->right                 = NULL;
@@ -197,6 +200,7 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 			// Basicaly make a linked list of OpNodes in order
 			AST_Node* childNode = (AST_Node*)dd_get(currentASTNode->children, i);
 			thisOpNode = buildOpTree(codeGen, childNode, thisOpNode, level + 1);
+			freeAllRegs(codeGen->regAlloc);
 			resetRegs(codeGen);
 
 			// Need to traverse all the way down the left side to place node
@@ -315,26 +319,28 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 			switch (currentASTNode->token->type) {
 			case(dl_PLUS):
 				thisOpNode->code = dcg_ADD;
-				goto general_arithmatic_biop;
-			case(dl_MINUS):
-				thisOpNode->code = dcg_SUB;
-				goto general_arithmatic_biop;
+				goto commutative_arithmatic_biop;
 			case(dl_MULT):
 				thisOpNode->code = dcg_MUL;
 
 				// All Biop statements so far lead here:
-				general_arithmatic_biop:
+				commutative_arithmatic_biop:
 
 				// Our left and right AST_Nodes can't both be literals because of the precomputation above
 				// Check both our right and left children in the AST, find a variable with a register to use as first arg
 				left_side_AST_node = dd_get(thisOpNode->ast_node->children, 0);
 				right_side_AST_node = dd_get(thisOpNode->ast_node->children, 1);
 
+				rightReg = putbackRegFromOpNode(codeGen->regAlloc, thisOpNode->right);
+				leftReg  = putbackRegFromOpNode(codeGen->regAlloc, thisOpNode->left);
+
 				// If the left node is the one we can store our value into
-				if ((left_side_AST_node->asmOpNode->arg_struct->arg_types & 0x0F) == dcg_OpCodeArgType_REG) {
+				if (leftReg != dcg_none) {
 
 					// Set first arg
-					thisOpNode->arg_struct->OpArg1.arg_reg = left_side_AST_node->asmOpNode->arg_struct->OpArg1.arg_reg;
+					// Use getReg because it will be our storage register
+					dcg_Reg temp = getReg(codeGen->regAlloc, leftReg, thisOpNode);
+					thisOpNode->arg_struct->OpArg1.arg_reg = temp;
 					setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_REG, dcg_OpCodeArgType_NONE);
 
 					// Set second arg
@@ -352,15 +358,13 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 					{
 
 						// Find the storage register for the right AST_Node
-						switch ((right_side_AST_node->asmOpNode->arg_struct->arg_types) & 0x0F) {
-						case(dcg_OpCodeArgType_REG):
-							thisOpNode->arg_struct->OpArg2.arg_reg = right_side_AST_node->asmOpNode->arg_struct->OpArg1.arg_reg;
+						if (rightReg != dcg_none) {
+							thisOpNode->arg_struct->OpArg2.arg_reg = rightReg;
 							setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_REG);
 							pushUsedReg(codeGen, right_side_AST_node->asmOpNode);
-							break;
-						default:
-							printf("CodeGen: Error, I don't know what to do with this Op arg when generating code for '+'\n");
-							break;
+						}
+						else {
+							printf("CodeGen: Error, I don't know what to do with this Op arg when generating code for '+/*'\n");
 						}
 					}
 						break;
@@ -373,12 +377,12 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 				}
 
 				// If the right node is the one we can store our value into
-				else if ((right_side_AST_node->asmOpNode->arg_struct->arg_types & 0x0F) == dcg_OpCodeArgType_REG){
+				else if (rightReg != dcg_none){
 				
 					// Set first arg
-					d_symbol* rightSymbol = getSymbol(codeGen->parser->table, right_side_AST_node->identName, right_side_AST_node->nameLength);
-					setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_STACKOFF, dcg_OpCodeArgType_NONE);
-					thisOpNode->arg_struct->OpArg1.arg_var = rightSymbol->symbol_name; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+					dcg_Reg temp = getReg(codeGen->regAlloc, rightReg, thisOpNode);
+					thisOpNode->arg_struct->OpArg1.arg_reg = temp;
+					setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_REG, dcg_OpCodeArgType_NONE);
 
 					// Set second arg
 					switch (left_side_AST_node->type) {
@@ -387,7 +391,7 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 					case(AST_INT):
 
 						setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_LIT);
-						thisOpNode->arg_struct->OpArg2.arg_int = right_side_AST_node->int_literal; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+						thisOpNode->arg_struct->OpArg2.arg_int = left_side_AST_node->int_literal; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
 						break;
 
 					default:
@@ -397,13 +401,189 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 				}
 				break;
 
+			case(dl_MINUS):
+
+				thisOpNode->code = dcg_SUB;
+
+				// Our left and right AST_Nodes can't both be literals because of the precomputation above
+				// Check both our right and left children in the AST, find a variable with a register to use as first arg
+				left_side_AST_node = dd_get(thisOpNode->ast_node->children, 0);
+				right_side_AST_node = dd_get(thisOpNode->ast_node->children, 1);
+
+				rightReg = peakRegFromOpNode(codeGen->regAlloc, thisOpNode->right);
+				leftReg  = putbackRegFromOpNode(codeGen->regAlloc, thisOpNode->left);
+
+				// If the left node is the one we can store our value into
+				// Then we could have the right operand be a literal
+				if (leftReg != dcg_none) {
+
+					// Set first arg
+					// Use getReg because it will be our storage register
+					dcg_Reg temp = getReg(codeGen->regAlloc, leftReg, thisOpNode);
+					thisOpNode->arg_struct->OpArg1.arg_reg = temp;
+					setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_REG, dcg_OpCodeArgType_NONE);
+
+					// Set second arg
+					switch (right_side_AST_node->type) {
+					case(AST_INT):
+
+						// Directly use the int_literal from the AST_INT node
+
+						setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_LIT);
+						thisOpNode->arg_struct->OpArg2.arg_int = right_side_AST_node->int_literal; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+						break;
+
+					case(AST_IDENT):
+					case(AST_BIOP):
+					{
+
+						// Find the storage register for the right AST_Node
+						if (rightReg != dcg_none) {
+							thisOpNode->arg_struct->OpArg2.arg_reg = rightReg;
+							setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_REG);
+							pushUsedReg(codeGen, right_side_AST_node->asmOpNode);
+						}
+						else {
+							printf("CodeGen: Error, I don't know what to do with this Op arg when generating code for '+/*'\n");
+						}
+					}
+						break;
+
+					default:
+						printf("CodeGen: Error Dont know how to add these AST + Children\n");
+						break;
+					}
+							
+					putbackRegFromOpNode(codeGen->regAlloc, thisOpNode->right);
+				}
+
+				// If the right node is the one we can store our value into
+				// Then we need to store the left operand in a register 
+				else if (rightReg != dcg_none){
+
+					// Left child (left side of - ) goes in a register
+					OpTreeNode* movOpNode = malloc(sizeof(OpTreeNode));
+					movOpNode->left                       = thisOpNode->left;
+					movOpNode->left->parent               = movOpNode;
+					movOpNode->right                      = thisOpNode->right;
+					movOpNode->right->parent              = movOpNode;
+					movOpNode->parent                     = thisOpNode;
+					movOpNode->code                       = dcg_MOV;
+					movOpNode->ast_node                   = thisOpNode->ast_node;
+					movOpNode->arg_struct                 = malloc(sizeof(dcg_ArgStruct));
+					movOpNode->arg_struct->arg_types      = (dcg_OpCodeArgType_REG | (dcg_OpCodeArgType_LIT << 4));
+					movOpNode->arg_struct->OpArg1.arg_reg = getReg(codeGen->regAlloc, dcg_none, thisOpNode);
+					movOpNode->arg_struct->OpArg2.arg_int = movOpNode->left->ast_node->int_literal;
+
+					thisOpNode->left = movOpNode;
+					thisOpNode->right = NULL;
+				
+					setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_REG, dcg_OpCodeArgType_REG);
+
+					// Set first arg
+					thisOpNode->arg_struct->OpArg1.arg_reg = movOpNode->arg_struct->OpArg1.arg_reg; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
+
+					// Set second arg
+					thisOpNode->arg_struct->OpArg2.arg_reg = rightReg;
+
+					putbackRegFromOpNode(codeGen->regAlloc, movOpNode->right);
+				}
+				break;
+
 			case(dl_DIVIDE):
-				thisOpNode->code = dcg_DIV;
+				
+
+				// Allocate OpNodes
+				OpTreeNode* xorOpNode = malloc(sizeof(OpTreeNode));
+				OpTreeNode* movOpNode = malloc(sizeof(OpTreeNode));
+
 				// Get eax
+				getReg(codeGen->regAlloc, dcg_eax, thisOpNode);
+
 				// Get edx
+				getReg(codeGen->regAlloc, dcg_edx, thisOpNode);
+
+				// Should I put this on the right side? so that they all get done last?
+				// Yes, you want these to happen right before the div op, nothing else should have a chance of running
+
 				// Zero edx
+				xorOpNode->left                       = thisOpNode->left;
+				xorOpNode->left->parent               = xorOpNode;
+				xorOpNode->right                      = thisOpNode->right;
+				xorOpNode->right->parent              = xorOpNode;
+				//xorOpNode->right                      = thisOpNode->right;
+				xorOpNode->parent                     = movOpNode;
+				xorOpNode->code                       = dcg_XOR;
+				xorOpNode->ast_node                   = thisOpNode->ast_node;
+				xorOpNode->arg_struct                 = malloc(sizeof(dcg_ArgStruct));
+				xorOpNode->arg_struct->arg_types      = (dcg_OpCodeArgType_REG | (dcg_OpCodeArgType_REG << 4));
+				xorOpNode->arg_struct->OpArg1.arg_reg = dcg_edx;
+				xorOpNode->arg_struct->OpArg2.arg_reg = dcg_edx;
+
 				// Left child (Dividend) goes in eax
+				movOpNode->left                       = xorOpNode;
+				movOpNode->right                      = NULL;
+				movOpNode->parent                     = thisOpNode;
+				movOpNode->code                       = dcg_MOV;
+				movOpNode->ast_node                   = thisOpNode->ast_node;
+				movOpNode->arg_struct                 = malloc(sizeof(dcg_ArgStruct));
+				movOpNode->arg_struct->arg_types      = (dcg_OpCodeArgType_REG | (dcg_OpCodeArgType_REG << 4));
+				movOpNode->arg_struct->OpArg1.arg_reg = dcg_eax;
+
+				// Set source opperand
+				leftReg  = putbackRegFromOpNode(codeGen->regAlloc, xorOpNode->left);
+
+				if (leftReg != dcg_none) {
+					movOpNode->arg_struct->OpArg2.arg_reg = leftReg;
+				}
+				// Assume left OpNode is an int litteral
+				else {
+					movOpNode->arg_struct->OpArg2.arg_int = thisOpNode->left->ast_node->int_literal;
+				}
+
+				thisOpNode->code = dcg_DIV;
+				thisOpNode->left = movOpNode;
+				thisOpNode->right = NULL;
+
 				// This OpNodes only argument is it's right child
+				// !! THIS IS WRONG. ITS TAKING INFORMATION ABOUT THE RIGHTSIDE
+				// AND PUTTING IN THE LEFT AS IF IT'S ALREADY HAPPENED
+				// This is why I should consider putting the xor and mov on the right side as parents
+				// Of whatever was already there
+				rightReg  = putbackRegFromOpNode(codeGen->regAlloc, xorOpNode->right);
+
+				if (rightReg != dcg_none) {
+				    thisOpNode->arg_struct->arg_types = dcg_OpCodeArgType_REG;
+					thisOpNode->arg_struct->OpArg1.arg_reg = rightReg;
+				}
+				else {
+					// Assume right OpNode is an int litteral
+
+					// Need to move it into a register
+					OpTreeNode* litMovOpNode = malloc(sizeof(OpTreeNode));
+					litMovOpNode->left                       = movOpNode;
+					litMovOpNode->left->parent               = litMovOpNode;
+					litMovOpNode->right                      = NULL;
+					litMovOpNode->parent                     = thisOpNode;
+					litMovOpNode->code                       = dcg_MOV;
+					litMovOpNode->ast_node                   = thisOpNode->ast_node;
+					litMovOpNode->arg_struct                 = malloc(sizeof(dcg_ArgStruct));
+					litMovOpNode->arg_struct->arg_types      = (dcg_OpCodeArgType_REG | (dcg_OpCodeArgType_LIT << 4));
+					litMovOpNode->arg_struct->OpArg1.arg_reg = getReg(codeGen->regAlloc, dcg_none, thisOpNode);
+					litMovOpNode->arg_struct->OpArg2.arg_int = xorOpNode->right->ast_node->int_literal;
+
+					thisOpNode->left = litMovOpNode;
+				    thisOpNode->arg_struct->arg_types = dcg_OpCodeArgType_REG;
+					// Can do this cause we just set this register and know for sure it's what we want
+					thisOpNode->arg_struct->OpArg1.arg_int = litMovOpNode->arg_struct->OpArg1.arg_reg;
+
+					// Can immedietly free this bc we don't need it anymore
+					putbackReg(codeGen->regAlloc, litMovOpNode->arg_struct->OpArg1.arg_reg);
+				}
+
+				// Only needed it to make sure the previous value didnt get erased, didn't actually store anything (we need rn) in it
+				putbackReg(codeGen->regAlloc, dcg_edx);
+
 				// Quotient gets stored in eax ( But this conflicts with how parents grab arguments from their children )
 				// Maybe storage register should be determined by searching the register allocator?!!!
 
@@ -418,7 +598,6 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 				setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_STACKOFF, dcg_OpCodeArgType_NONE);
 				thisOpNode->arg_struct->OpArg1.arg_var = leftSymbol->symbol_name; // TODO: Sketch, cleanup because this memory is allocated for the symbol in symtbl
 				
-
 				// Second ARG of the mov op
 				right_side_AST_node = dd_get(thisOpNode->ast_node->children, 1);
 				switch (right_side_AST_node->type) {
@@ -433,16 +612,14 @@ OpTreeNode * buildOpTree(code_generator* codeGen, AST_Node* currentASTNode, OpTr
 				case(AST_BIOP):
 					{
 						// Get the register that the final value of the right AST node was stored in
-						switch ((right_side_AST_node->asmOpNode->arg_struct->arg_types) & 0x0F) {
+						dcg_Reg rightReg = putbackRegFromOpNode(codeGen->regAlloc, thisOpNode->right);
 
-						case(dcg_OpCodeArgType_REG):
-							thisOpNode->arg_struct->OpArg2.arg_reg = right_side_AST_node->asmOpNode->arg_struct->OpArg1.arg_reg;
+						if (rightReg != dcg_none) {
+							thisOpNode->arg_struct->OpArg2.arg_reg = rightReg;
 							setArgTypes(&(thisOpNode->arg_struct->arg_types), dcg_OpCodeArgType_NONE, dcg_OpCodeArgType_REG);
-							break;
-
-						default:
+						}
+						else {
 							printf("CodeGen: Error, I don't know what to do with this Op arg when generating code for '='\n");
-							break;
 						}
 					}
 
@@ -809,10 +986,11 @@ void writeOpTree(code_generator * codeGen, OpTreeNode * node) {
 	case(dcg_DIV):
 
 		// TODO: Division is currently broken, need to fix
-		appendLineEndReg(codeGen, dcg_XOR, dcg_edx, dcg_edx); // TODO: this really needs to be moved to buildOpTree
+		//appendLineEndReg(codeGen, dcg_XOR, dcg_edx, dcg_edx); // TODO: this really needs to be moved to buildOpTree
 		appendOpLine(codeGen, node);
 		break;
 
+	case(dcg_XOR):
 	case(dcg_MOV):
 	case(dcg_ADD):
 	case(dcg_SUB):

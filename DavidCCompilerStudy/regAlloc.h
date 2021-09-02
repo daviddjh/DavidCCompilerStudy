@@ -11,5 +11,8 @@ typedef struct RegAlloc {
 
 void initRegAlloc(RegAlloc* regAlloc);
 dcg_Reg getReg(RegAlloc* regAlloc, dcg_Reg reg, OpTreeNode* node);
+void freeAllRegs(RegAlloc* regAlloc);
 void putbackReg(RegAlloc* regAlloc, dcg_Reg reg);
-
+dcg_Reg putbackRegFromOpNode(RegAlloc* regAlloc, OpTreeNode* node);
+dcg_Reg peakRegFromOpNode(RegAlloc* regAlloc, OpTreeNode* node);
+dcg_Reg findOpNodesReg(RegAlloc* regAlloc, OpTreeNode* node);

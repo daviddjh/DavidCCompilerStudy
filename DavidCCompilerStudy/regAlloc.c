@@ -5,7 +5,22 @@ void initRegAlloc(RegAlloc* regAlloc){
 
   for(int i = 0; i < dcg_COUNT; i++){
     regAlloc->regArray[i] = NULL;
-    //regAlloc->regArray[i] = NULL;
+  }
+}
+
+dcg_Reg findOpNodesReg(RegAlloc* regAlloc, OpTreeNode* node) {
+
+	for (int i = 0; i < dcg_COUNT; i++) {
+		if (regAlloc->regArray[i] == node) {
+			return i;
+		}
+	}
+	return dcg_none;
+}
+
+void freeAllRegs(RegAlloc* regAlloc) {
+  for(int i = 0; i < dcg_COUNT; i++){
+    regAlloc->regArray[i] = NULL;
   }
 }
 
@@ -23,6 +38,8 @@ dcg_Reg getReg(RegAlloc* regAlloc, dcg_Reg reg, OpTreeNode* node) {
 
 				// Create move op to move register contents
 
+				// THIS IS WRONG. It should be moved in the current time, not in the past
+				// The current reg alloc array stores the state of registers in the present, not the past
 				OpTreeNode* movNode = malloc(sizeof(OpTreeNode));
 				movNode->left = NULL;
 				movNode->right = NULL;
@@ -50,7 +67,7 @@ dcg_Reg getReg(RegAlloc* regAlloc, dcg_Reg reg, OpTreeNode* node) {
 					}
 					movNode->left = nodeWithOurReg;
 				}
-
+				regAlloc->regArray[reg] = node;
 				return reg;
 			}
 			else {
@@ -104,6 +121,25 @@ dcg_Reg getReg(RegAlloc* regAlloc, dcg_Reg reg, OpTreeNode* node) {
       return i;
     }
   }
+}
+
+dcg_Reg putbackRegFromOpNode(RegAlloc* regAlloc, OpTreeNode* node) {
+	for (int i = 0; i < dcg_COUNT; i++) {
+		if (regAlloc->regArray[i] == node) {
+			regAlloc->regArray[i] = NULL;
+			return i;
+		}
+	}
+	return dcg_none;
+}
+
+dcg_Reg peakRegFromOpNode(RegAlloc* regAlloc, OpTreeNode* node) {
+	for (int i = 0; i < dcg_COUNT; i++) {
+		if (regAlloc->regArray[i] == node) {
+			return i;
+		}
+	}
+	return dcg_none;
 }
 
 void putbackReg(RegAlloc* regAlloc, dcg_Reg reg){
